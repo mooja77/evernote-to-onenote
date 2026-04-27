@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20260421T120000Z" application="Evernote" version="10.0">
+  <note>
+    <title>Note With Partial Resources</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><p>Note with some bad resource attachments.</p></en-note>]]></content>
+    <created>20260401T090000Z</created>
+    <!-- Resource 1: has data but missing mime -->
+    <resource>
+      <data>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</data>
+      <resource-attributes>
+        <filename>no-mime.png</filename>
+      </resource-attributes>
+    </resource>
+    <!-- Resource 2: has mime but missing data -->
+    <resource>
+      <mime>image/png</mime>
+      <resource-attributes>
+        <filename>no-data.png</filename>
+      </resource-attributes>
+    </resource>
+    <!-- Resource 3: has data and mime but no resource-attributes at all -->
+    <resource>
+      <data>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</data>
+      <mime>image/jpeg</mime>
+    </resource>
+    <!-- Resource 4: fully valid resource for comparison -->
+    <resource>
+      <data>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</data>
+      <mime>image/png</mime>
+      <resource-attributes>
+        <filename>valid.png</filename>
+      </resource-attributes>
+    </resource>
+  </note>
+</en-export>

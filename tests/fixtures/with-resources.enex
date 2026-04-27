@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20260412T120000Z" application="Evernote" version="10.0">
+  <note>
+    <title>Note With Attachment</title>
+    <created>20260201T100000Z</created>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+  <p>See attached file.</p>
+  <en-media type="image/png" hash="f829b914fc47cfc9c0747c119c27cf1b"/>
+</en-note>]]></content>
+    <resource>
+      <data>iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==</data>
+      <mime>image/png</mime>
+      <resource-attributes>
+        <filename>photo.png</filename>
+      </resource-attributes>
+    </resource>
+  </note>
+</en-export>

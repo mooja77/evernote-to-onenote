@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20260412T120000Z" application="Evernote" version="10.0">
+
+  <note>
+    <title>Project Ideas</title>
+    <created>20260101T090000Z</created>
+    <updated>20260110T143000Z</updated>
+    <tag>ideas</tag>
+    <tag>work</tag>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+  <p>Here are some project ideas for Q1:</p>
+  <ul>
+    <li><en-todo/>Launch the new dashboard</li>
+    <li><en-todo checked="true"/>Research competitor pricing</li>
+    <li><en-todo/>Write technical specs</li>
+  </ul>
+  <p>See also the <a href="https://example.com">project wiki</a> for background.</p>
+</en-note>]]></content>
+  </note>
+
+  <note>
+    <title>Meeting Notes — 2026-01-15</title>
+    <created>20260115T140000Z</created>
+    <updated>20260115T160000Z</updated>
+    <tag>meetings</tag>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+  <h2>Attendees</h2>
+  <p>John, Sarah, Mike</p>
+  <h2>Action Items</h2>
+  <ul>
+    <li><en-todo/>John: Send revised proposal by Friday</li>
+    <li><en-todo/>Sarah: Schedule follow-up call</li>
+    <li><en-todo checked="true"/>Mike: Share access to shared drive</li>
+  </ul>
+  <h2>Notes</h2>
+  <p>We agreed to move the deadline to end of January. Budget approved at <b>€15,000</b>.</p>
+</en-note>]]></content>
+  </note>
+
+  <note>
+    <title>Recipe: Chocolate Cake</title>
+    <created>20260203T180000Z</created>
+    <updated>20260203T183000Z</updated>
+    <tag>personal</tag>
+    <tag>recipes</tag>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>
+  <h2>Ingredients</h2>
+  <ul>
+    <li>200g dark chocolate</li>
+    <li>175g butter</li>
+    <li>3 eggs</li>
+    <li>200g caster sugar</li>
+    <li>100g plain flour</li>
+  </ul>
+  <h2>Method</h2>
+  <ol>
+    <li>Preheat oven to 180°C.</li>
+    <li>Melt chocolate and butter together.</li>
+    <li>Whisk eggs and sugar until pale, fold in chocolate mixture.</li>
+    <li>Sift in flour, fold gently. Pour into tin and bake 25 minutes.</li>
+  </ol>
+  <p><i>Serves 8. Best served warm with cream.</i></p>
+</en-note>]]></content>
+  </note>
+
+</en-export>

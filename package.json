@@ -1,0 +1,51 @@
+{
+  "name": "evernote-to-onenote",
+  "version": "1.0.0",
+  "description": "Import Evernote .enex exports into Microsoft OneNote via the Graph API — resumable, scriptable, parallel",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "evernote-to-onenote": "src/index.js"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "PRIVACY.md"
+  ],
+  "keywords": [
+    "evernote",
+    "onenote",
+    "migration",
+    "enex",
+    "microsoft-graph",
+    "notes",
+    "import",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooja77/evernote-to-onenote.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mooja77/evernote-to-onenote/issues"
+  },
+  "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/*.test.js",
+    "pack:check": "node scripts/prepublish-check.mjs",
+    "prepublishOnly": "node scripts/prepublish-check.mjs && npm test"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.1.2",
+    "form-data": "^4.0.5",
+    "node-fetch": "^2.7.0",
+    "open": "^11.0.0",
+    "xml2js": "^0.6.2"
+  }
+}
