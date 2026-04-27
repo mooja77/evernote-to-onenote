@@ -38,8 +38,8 @@ describe('parseEnexFile', () => {
     assert.deepEqual(notes[1].tags, []);
   });
 
-  test('parses real test.enex (3 notes)', async () => {
-    const notes = await parseEnexFile(fix('../../test.enex'));
+  test('parses mixed-notes fixture (3 notes)', async () => {
+    const notes = await parseEnexFile(fix('mixed-notes.enex'));
     assert.equal(notes.length, 3);
     assert.equal(notes[0].title, 'Project Ideas');
     assert.equal(notes[1].title, 'Meeting Notes — 2026-01-15');

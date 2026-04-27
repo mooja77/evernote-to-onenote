@@ -36,8 +36,8 @@
   "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test tests/*.test.js",
-    "test:unit": "node --test tests/*.test.js",
+    "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs",
     "pack:check": "node scripts/prepublish-check.mjs",
     "prepublishOnly": "node scripts/prepublish-check.mjs && npm test"
   },
