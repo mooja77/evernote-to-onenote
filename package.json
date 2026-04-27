@@ -4,7 +4,7 @@
   "description": "Import Evernote .enex exports into Microsoft OneNote via the Graph API — resumable, scriptable, parallel",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "bin": {
     "evernote-to-onenote": "src/index.js"

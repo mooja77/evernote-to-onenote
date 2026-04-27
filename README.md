@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/mooja77/evernote-to-onenote/actions/workflows/ci.yml/badge.svg)](https://github.com/mooja77/evernote-to-onenote/actions/workflows/ci.yml)
-[![Node >=18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![Node >=20](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
 A transparent, scriptable, resumable CLI from JMS Dev Lab that migrates your entire Evernote export into Microsoft OneNote in a single command — with receipts. The open-source alternative to Evernote's own migration path: you can see what will happen before it happens, stop and resume at any point, and script around it.
 
@@ -14,7 +14,7 @@ A transparent, scriptable, resumable CLI from JMS Dev Lab that migrates your ent
 npm install -g github:mooja77/evernote-to-onenote
 ```
 
-Requires Node.js 18 or later. No other runtime dependencies.
+Requires Node.js 20 or later. No other runtime dependencies.
 
 ---
 

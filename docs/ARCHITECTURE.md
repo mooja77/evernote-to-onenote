@@ -325,7 +325,7 @@ Non-API edge cases:
 | `tests/batch-html-resume.test.js` | Coder A | batch + --output-html + --resume interaction |
 | `tests/enex-parser.test.js` | shared | 100MB guard, single-note vs array |
 
-Integration harness: `node --test tests/*.test.js` (no extra deps). Fixture ENEX files live under `tests/fixtures/`.
+Integration harness: `npm test` (no extra deps). Fixture ENEX files live under `tests/fixtures/`.
 
 ---
 

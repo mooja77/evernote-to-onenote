@@ -39,7 +39,7 @@ Ship `evernote-to-onenote` as a public goodwill project that is safe to publish,
 ## Phase 4: Public Launch Assets
 
 - Create a public GitHub repository under the chosen organisation/account.
-- Enable GitHub Actions CI on Windows and Ubuntu for Node 18, 20, and 22.
+- Enable GitHub Actions CI on Windows and Ubuntu for Node 20 and 22.
 - Add release notes, screenshots or terminal GIF, issue labels, and a `good first issue` backlog.
 - Add a JMS website page and short blog post explaining why the tool exists, who it is for, and its privacy model.
 - Decide separately whether to publish to npm. GitHub can go public first; npm should wait until install docs and package dry-run are final.
