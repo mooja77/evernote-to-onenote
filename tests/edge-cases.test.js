@@ -31,10 +31,14 @@ const { OneNoteClient } = require('../src/onenote-client');
 require.cache[fetchCachePath] = origFetchEntry;
 
 function makeResp(status, body = {}, headers = {}) {
+  const headerMap = Object.fromEntries(
+    Object.entries({ 'content-type': 'application/json', ...headers })
+      .map(([key, value]) => [key.toLowerCase(), value])
+  );
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (k) => ({ 'content-type': 'application/json', ...headers })[k] ?? null },
+    headers: { get: (k) => headerMap[String(k).toLowerCase()] ?? null },
     json: async () => body,
     text: async () => JSON.stringify(body),
   };
@@ -150,7 +154,7 @@ describe('Reliability — 409 conflict retry (additional paths)', () => {
   });
 
   test('409 exhausted retries throw with status code in message', async () => {
-    fetchHandler = async () => makeResp(409);
+    fetchHandler = async () => makeResp(409, {}, { 'Retry-After': '0' });
     const client = new OneNoteClient({ accessToken: 'tok' });
     let err;
     try { await client.createPage('sec-1', 'T', '<html>t</html>'); } catch (e) { err = e; }
@@ -237,14 +241,32 @@ describe('interactiveSetup — mocked readline', () => {
     delete require.cache[require.resolve('../src/ui')];
   }
 
+  async function withSuppressedOutput(fn, { captureLog = false } = {}) {
+    const logged = [];
+    const origLog = console.log;
+    const origError = console.error;
+    const origWrite = process.stdout.write.bind(process.stdout);
+    console.log = (...args) => {
+      if (captureLog) logged.push(args.join(' '));
+    };
+    console.error = () => {};
+    process.stdout.write = () => true;
+    try {
+      return await fn(logged);
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+      process.stdout.write = origWrite;
+    }
+  }
+
   function mockExit() {
     const calls = [];
-    const orig = process.exit;
-    process.exit = (code) => {
+    const exit = (code) => {
       calls.push(code);
-      throw new Error(`process.exit(${code})`);
+      return [];
     };
-    return { calls, restore: () => { process.exit = orig; } };
+    return { calls, exit };
   }
 
   test('returns .enex files from valid directory when user confirms Y', async () => {
@@ -258,7 +280,7 @@ describe('interactiveSetup — mocked readline', () => {
     delete require.cache[require.resolve('../src/ui')];
     try {
       const { interactiveSetup } = require('../src/ui');
-      const files = await interactiveSetup();
+      const files = await withSuppressedOutput(() => interactiveSetup());
       assert.ok(Array.isArray(files), 'should return an array');
       assert.equal(files.length, 2);
       assert.ok(files.some(f => f.endsWith('notebook1.enex')));
@@ -278,10 +300,9 @@ describe('interactiveSetup — mocked readline', () => {
     const exitMock = mockExit();
     try {
       const { interactiveSetup } = require('../src/ui');
-      await assert.rejects(() => interactiveSetup(), /process\.exit\(0\)/);
+      await withSuppressedOutput(() => interactiveSetup({ exit: exitMock.exit }));
       assert.equal(exitMock.calls[0], 0);
     } finally {
-      exitMock.restore();
       restoreReadline(origRL);
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -296,10 +317,9 @@ describe('interactiveSetup — mocked readline', () => {
     const exitMock = mockExit();
     try {
       const { interactiveSetup } = require('../src/ui');
-      await assert.rejects(() => interactiveSetup(), /process\.exit\(0\)/);
+      await withSuppressedOutput(() => interactiveSetup({ exit: exitMock.exit }));
       assert.equal(exitMock.calls[0], 0);
     } finally {
-      exitMock.restore();
       restoreReadline(origRL);
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -311,10 +331,9 @@ describe('interactiveSetup — mocked readline', () => {
     const exitMock = mockExit();
     try {
       const { interactiveSetup } = require('../src/ui');
-      await assert.rejects(() => interactiveSetup(), /process\.exit\(1\)/);
+      await withSuppressedOutput(() => interactiveSetup({ exit: exitMock.exit }));
       assert.equal(exitMock.calls[0], 1);
     } finally {
-      exitMock.restore();
       restoreReadline(origRL);
     }
   });
@@ -325,10 +344,9 @@ describe('interactiveSetup — mocked readline', () => {
     const exitMock = mockExit();
     try {
       const { interactiveSetup } = require('../src/ui');
-      await assert.rejects(() => interactiveSetup(), /process\.exit\(1\)/);
+      await withSuppressedOutput(() => interactiveSetup({ exit: exitMock.exit }));
       assert.equal(exitMock.calls[0], 1);
     } finally {
-      exitMock.restore();
       restoreReadline(origRL);
     }
   });
@@ -342,10 +360,9 @@ describe('interactiveSetup — mocked readline', () => {
     const exitMock = mockExit();
     try {
       const { interactiveSetup } = require('../src/ui');
-      await assert.rejects(() => interactiveSetup(), /process\.exit\(1\)/);
+      await withSuppressedOutput(() => interactiveSetup({ exit: exitMock.exit }));
       assert.equal(exitMock.calls[0], 1);
     } finally {
-      exitMock.restore();
       restoreReadline(origRL);
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -358,17 +375,16 @@ describe('interactiveSetup — mocked readline', () => {
     const origRL = installFakeReadline([tmpDir, 'Y']);
     delete require.cache[require.resolve('../src/ui')];
 
-    const logged = [];
-    const origLog = console.log;
-    console.log = (...args) => logged.push(args.join(' '));
-
+    let logged = [];
     try {
       const { interactiveSetup } = require('../src/ui');
-      await interactiveSetup();
-      assert.ok(logged.some(l => l.includes('my-notebook.enex')), 'should list the found notebook');
+      logged = await withSuppressedOutput(async (lines) => {
+        await interactiveSetup();
+        return lines;
+      }, { captureLog: true });
+      assert.ok(logged.some(l => l.includes('my-notebook')), 'should list the found notebook');
       assert.ok(logged.some(l => l.includes('1')), 'should show count of notebooks');
     } finally {
-      console.log = origLog;
       restoreReadline(origRL);
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -383,7 +399,7 @@ describe('interactiveSetup — mocked readline', () => {
     delete require.cache[require.resolve('../src/ui')];
     try {
       const { interactiveSetup } = require('../src/ui');
-      const files = await interactiveSetup();
+      const files = await withSuppressedOutput(() => interactiveSetup());
       assert.equal(files.length, 1);
     } finally {
       restoreReadline(origRL);

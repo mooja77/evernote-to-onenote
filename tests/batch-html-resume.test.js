@@ -325,7 +325,7 @@ describe('CLI — --resume and progress tracking', () => {
     try {
       const { status, stdout } = run([fix('single-note.enex'), '--dry-run', '--resume'], { cwd: cwdDir });
       assert.equal(status, 0);
-      assert.match(stdout, /Resume.*enabled/i);
+      assert.match(stdout, /Resume.*on/i);
     } finally {
       fs.rmSync(cwdDir, { recursive: true, force: true });
     }

@@ -78,7 +78,6 @@ async function getAuthenticatedToken({ noInteractive = false } = {}) {
   if (accounts.length > 0) {
     try {
       const result = await app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-      console.log('[auth] Silent acquire success');
       return result.accessToken;
     } catch (err) {
       const isInvalidGrant =
@@ -88,18 +87,17 @@ async function getAuthenticatedToken({ noInteractive = false } = {}) {
         (typeof err.message === 'string' && err.message.includes('invalid_grant'));
 
       if (isInvalidGrant) {
-        console.log('[auth] Token expired (invalid_grant) — clearing cache, will re-authenticate via device-code');
+        console.warn('  ⚠ Your saved login has expired. You will be asked to sign in again.');
         try { fs.unlinkSync(CACHE_FILE); } catch { /* already gone */ }
-      } else {
-        console.log(`[auth] Silent acquire failed (${err.name}), falling back to device-code`);
       }
+      // Other silent failures fall through to device-code below
     }
   }
 
   if (noInteractive) {
     throw new Error(
       'Authentication required but no interactive terminal available. ' +
-      'Run: node src/index.js --auth  (then retry this command)'
+      'Run: evernote-to-onenote --auth  (then retry this command)'
     );
   }
 
@@ -109,15 +107,25 @@ async function getAuthenticatedToken({ noInteractive = false } = {}) {
 async function runAuthFlow() {
   const app = buildMsalApp();
 
-  console.log('[auth] Device-code flow initiated');
+  console.log('\nSigning in to Microsoft...');
+  console.log('─────────────────────────────────────────────');
+  console.log('This tool needs permission to create and read notes in your OneNote.');
+  console.log('You will be asked to visit a short URL and enter a code to approve access.');
+  console.log('');
+  console.log('Note: use a PERSONAL Microsoft account (Outlook.com / Hotmail / Live).');
+  console.log('Work or school accounts (Microsoft 365 / Entra ID) are not supported.');
+  console.log('');
+
   const result = await app.acquireTokenByDeviceCode({
     scopes: SCOPES,
     deviceCodeCallback: (response) => {
-      console.log('\n' + response.message + '\n');
+      // MSAL's default message tells user to visit microsoft.com/devicelogin and enter the code.
+      // Print it verbatim — it already contains the URL and code.
+      console.log(response.message + '\n');
     },
   });
 
-  console.log('[auth] Token acquired via device-code');
+  console.log('  ✓ Signed in successfully. Your session is saved — you won\'t need to do this again.');
   return result.accessToken;
 }
 

@@ -250,8 +250,8 @@ class OneNoteClient {
       if (attempt > MAX_RETRIES) {
         throw new Error(`OneNote API rate limit exceeded after ${MAX_RETRIES} retries`);
       }
-      const retryAfter = parseInt(res.headers.get('Retry-After') || '0', 10);
-      const delay = retryAfter > 0 ? retryAfter * 1000 : backoffDelay(attempt);
+      const retryAfterMs = retryAfterDelayMs(res.headers);
+      const delay = retryAfterMs ?? backoffDelay(attempt);
       // Signal all concurrent import tasks to pause for the same duration
       if (this._globalBackoff) this._globalBackoff.set(delay);
       console.warn(`  [rate-limit] 429 — waiting ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
@@ -280,7 +280,7 @@ class OneNoteClient {
         const errBody = await res.text();
         throw new Error(`OneNote API conflict (409) after ${MAX_RETRIES} retries: ${errBody.slice(0, 200)}`);
       }
-      const delay = backoffDelay(attempt);
+      const delay = retryAfterDelayMs(res.headers) ?? backoffDelay(attempt);
       console.warn(`  [conflict] 409 — retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
       return this._fetchWithRetry(url, options, attempt + 1);
@@ -288,8 +288,8 @@ class OneNoteClient {
 
     if (res.status === 503) {
       if (attempt > MAX_RETRIES) throw new Error('OneNote API 503 after max retries');
-      const retryAfter503 = parseInt(res.headers.get('Retry-After') || '0', 10);
-      const delay = retryAfter503 > 0 ? retryAfter503 * 1000 : backoffDelay(attempt);
+      const retryAfter503Ms = retryAfterDelayMs(res.headers);
+      const delay = retryAfter503Ms ?? backoffDelay(attempt);
       console.warn(`  [service-unavailable] 503 — retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
       return this._fetchWithRetry(url, options, attempt + 1);
@@ -320,6 +320,13 @@ class OneNoteClient {
 function backoffDelay(attempt) {
   const exp = Math.min(BACKOFF_BASE_MS * Math.pow(2, attempt - 1), BACKOFF_MAX_MS);
   return exp * (1 + Math.random() * 0.3);
+}
+
+function retryAfterDelayMs(headers) {
+  const value = headers.get('Retry-After');
+  if (value == null || value === '') return null;
+  const seconds = Number.parseInt(value, 10);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
 }
 
 function sleep(ms) {
