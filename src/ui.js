@@ -116,7 +116,7 @@ function describeError(err) {
 // Prompts the user interactively for a .enex directory and start confirmation.
 // Re-prompts on invalid input (up to MAX_ATTEMPTS) so beginners are not
 // dropped out on the first mistake. Returns an array of resolved .enex paths.
-async function interactiveSetup({ dryRun = false } = {}) {
+async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const MAX_ATTEMPTS = 5;
   let ask;
@@ -212,7 +212,7 @@ async function interactiveSetup({ dryRun = false } = {}) {
       console.error('Too many failed attempts.');
       console.error('Run: evernote-to-onenote --help  for usage instructions.');
       rl.close();
-      process.exit(1);
+      return exit(1);
     }
 
     console.log('');
@@ -238,7 +238,7 @@ async function interactiveSetup({ dryRun = false } = {}) {
 
     if (confirm.trim().toLowerCase() === 'n') {
       console.log('Cancelled. Your files were not changed.');
-      process.exit(0);
+      return exit(0);
     }
 
     return enexFiles;

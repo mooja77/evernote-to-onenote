@@ -28,10 +28,14 @@ const { OneNoteClient } = require('../src/onenote-client');
 require.cache[fetchCachePath] = origFetchEntry;
 
 function makeResponse(status, body = {}, headers = {}) {
+  const headerMap = Object.fromEntries(
+    Object.entries({ 'content-type': 'application/json', ...headers })
+      .map(([key, value]) => [key.toLowerCase(), value])
+  );
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (k) => ({ 'content-type': 'application/json', ...headers })[k] ?? null },
+    headers: { get: (k) => headerMap[String(k).toLowerCase()] ?? null },
     json: async () => body,
     text: async () => JSON.stringify(body),
   };
@@ -158,7 +162,7 @@ describe('OneNoteClient — 409 conflict retry', () => {
     let calls = 0;
     fetchHandler = async () => {
       calls++;
-      if (calls < 3) return makeResponse(409);
+      if (calls < 3) return makeResponse(409, {}, { 'Retry-After': '0' });
       return makeResponse(201, { id: 'page-1', title: 'Test' });
     };
     const client = new OneNoteClient({ accessToken: 'tok' });
@@ -168,7 +172,7 @@ describe('OneNoteClient — 409 conflict retry', () => {
   });
 
   test('409 after MAX_RETRIES throws with conflict message', async () => {
-    fetchHandler = async () => makeResponse(409, { error: 'conflict' });
+    fetchHandler = async () => makeResponse(409, { error: 'conflict' }, { 'Retry-After': '0' });
     const client = new OneNoteClient({ accessToken: 'tok' });
     await assert.rejects(
       () => client.createPage('sec-1', 'Test', '<html>test</html>'),
@@ -324,7 +328,7 @@ describe('OneNoteClient — 507 OneDrive storage full', () => {
     let calls = 0;
     fetchHandler = async () => {
       calls++;
-      if (calls === 1) return makeResponse(503, {}, { 'Retry-After': '1' });
+      if (calls === 1) return makeResponse(503, {}, { 'Retry-After': '0' });
       return makeResponse(201, { id: 'p', title: 'T' });
     };
     const client = new OneNoteClient({ accessToken: 'tok' });

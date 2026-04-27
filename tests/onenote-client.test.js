@@ -15,11 +15,19 @@ let fetchHandler = null;
 
 function makeFakeResponse(status, body, headers = {}) {
   const defaultHeaders = { 'content-type': 'application/json' };
-  const mergedHeaders = { ...defaultHeaders, ...headers };
+  const mergedHeaders = Object.fromEntries(
+    Object.entries({ ...defaultHeaders, ...headers })
+      .map(([key, value]) => [key.toLowerCase(), value])
+  );
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (key) => mergedHeaders[key] !== undefined ? String(mergedHeaders[key]) : null },
+    headers: {
+      get: (key) => {
+        const value = mergedHeaders[String(key).toLowerCase()];
+        return value !== undefined ? String(value) : null;
+      },
+    },
     json: async () => body,
     text: async () => JSON.stringify(body),
   };
