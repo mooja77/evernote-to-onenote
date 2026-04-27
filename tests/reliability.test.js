@@ -143,7 +143,7 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
       const auth = require('../src/auth');
       await assert.rejects(
         () => auth.getAuthenticatedToken({ noInteractive: true }),
-        /Run: node src\/index\.js --auth/
+        /evernote-to-onenote --auth/
       );
     } finally {
       restoreMsal(origEntry);

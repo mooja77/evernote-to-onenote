@@ -34,27 +34,82 @@ class ProgressBar {
 // Maps a caught error to an actionable next-step hint, or returns null.
 function describeError(err) {
   const msg = (err.message || '').toLowerCase();
-  if (msg.includes('401') || msg.includes('authentication failed')) {
-    return '  → Re-authenticate: evernote-to-onenote --auth';
+
+  // Auth errors
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('authentication failed')) {
+    return '  → Your login session expired. Run: evernote-to-onenote --auth\n' +
+           '    Note: only personal Microsoft accounts are supported (not work/school).';
   }
-  if (msg.includes('429') || msg.includes('rate limit')) {
-    return '  → Wait a few minutes, then retry with: --resume';
+  if (msg.includes('consent_required') || msg.includes('interaction_required') || msg.includes('consent required')) {
+    return '  → Microsoft requires you to approve access again. Run: evernote-to-onenote --auth';
   }
-  if (msg.includes('507') || msg.includes('storage full')) {
-    return '  → Free up OneDrive storage at onedrive.live.com, then retry with: --resume';
+  if (msg.includes('invalid_grant')) {
+    return '  → Your saved login is no longer valid. Run: evernote-to-onenote --auth';
   }
-  if (msg.includes('503')) {
-    return '  → Microsoft service temporarily unavailable — retry later with: --resume';
+
+  // Account type mismatch
+  if (msg.includes('aadsts') || msg.includes('work or school') || msg.includes('tenant')) {
+    return '  → This tool only works with personal Microsoft accounts (Outlook.com / Hotmail / Live).\n' +
+           '    Work and school accounts (Microsoft 365 / Entra ID) are not supported.';
   }
+
+  // Rate limiting
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) {
+    return '  → Microsoft has temporarily slowed your requests. Wait a few minutes, then:\n' +
+           '    evernote-to-onenote --batch <dir> --resume';
+  }
+
+  // Storage / section overflow
+  if (msg.includes('507') || msg.includes('storage full') || msg.includes('insufficient storage')) {
+    return '  → Your OneDrive is full. Free up space at onedrive.live.com, then:\n' +
+           '    evernote-to-onenote --batch <dir> --resume';
+  }
+
+  // Service errors
+  if (msg.includes('503') || msg.includes('service unavailable')) {
+    return '  → Microsoft\'s servers are temporarily unavailable. Try again in a few minutes:\n' +
+           '    evernote-to-onenote --batch <dir> --resume';
+  }
+  if (msg.includes('500') || msg.includes('internal server error')) {
+    return '  → Microsoft returned a server error. This is usually temporary — retry with:\n' +
+           '    evernote-to-onenote --batch <dir> --resume';
+  }
+
+  // Client errors
+  if (msg.includes('400') || msg.includes('bad request')) {
+    return '  → The note could not be accepted by OneNote (possibly invalid content or attachment).\n' +
+           '    The importer will continue with other notes. Check the note content in Evernote.';
+  }
+  if (msg.includes('404') || msg.includes('not found')) {
+    return '  → Resource not found in OneNote. This is usually harmless — the importer will continue.';
+  }
+  if (msg.includes('413') || msg.includes('payload too large') || msg.includes('request entity too large')) {
+    return '  → This note is too large to import directly (>25 MB including attachments).\n' +
+           '    Try removing large attachments from this note in Evernote before exporting.';
+  }
+  if (msg.includes('409') || msg.includes('conflict')) {
+    return '  → A page with this title already exists in OneNote. Use --on-conflict rename to auto-rename.';
+  }
+
+  // File system errors
   if (err.code === 'ENOENT') {
-    return '  → File not found — check the path is correct';
+    return '  → File not found — check the path is correct and the file exists.';
   }
-  if (err.code === 'EACCES') {
-    return '  → Permission denied — check you have read access to this file';
+  if (err.code === 'EACCES' || err.code === 'EPERM') {
+    return '  → Permission denied — check you have read access to this file.';
   }
-  if (msg.includes('econnreset') || msg.includes('etimedout') || msg.includes('network') || msg.includes('fetch failed')) {
-    return '  → Network error — check your internet connection and retry with: --resume';
+  if (err.code === 'ENOSPC') {
+    return '  → Not enough disk space to save progress. Free up space and retry.';
   }
+
+  // Network errors
+  if (msg.includes('econnreset') || msg.includes('econnrefused') || msg.includes('etimedout') ||
+      msg.includes('network') || msg.includes('fetch failed') || msg.includes('socket hang up') ||
+      msg.includes('dns') || msg.includes('getaddrinfo')) {
+    return '  → Network error — check your internet connection, then:\n' +
+           '    evernote-to-onenote --batch <dir> --resume';
+  }
+
   return null;
 }
 
@@ -93,18 +148,34 @@ async function interactiveSetup({ dryRun = false } = {}) {
   }
 
   try {
-    console.log('\nEvernote → OneNote Importer (guided mode)');
+    console.log('\n╔══════════════════════════════════════════════════╗');
+    console.log('║         Evernote → OneNote Importer              ║');
+    console.log('╚══════════════════════════════════════════════════╝');
+    console.log('');
+    console.log('This tool moves your Evernote notes into Microsoft OneNote.');
+    console.log('Nothing is deleted from Evernote — it only creates new pages in OneNote.');
+    console.log('');
+    console.log('What you will need:');
+    console.log('  • A personal Microsoft account (Outlook.com / Hotmail / Live)');
+    console.log('    Work/school accounts (Microsoft 365) are NOT supported.');
+    console.log('  • Your Evernote notebooks exported as .enex files (see below)');
+    console.log('');
     console.log('─────────────────────────────────────────────');
-    console.log('\nHow to export your notebooks from Evernote:');
-    console.log('  1. Open Evernote and click the notebook you want to export.');
-    console.log('  2. Go to File → Export Notes...  (or right-click the notebook).');
-    console.log('  3. Choose "ENEX format (.enex)" and save to a folder.');
-    console.log('  4. Repeat for each notebook, then enter the folder path below.\n');
+    console.log('Step 1 of 3: Export your notebooks from Evernote');
+    console.log('─────────────────────────────────────────────');
+    console.log('');
+    console.log('  1. Open Evernote on your computer.');
+    console.log('  2. Right-click a notebook → "Export Notebook..."');
+    console.log('     (or go to File → Export Notes)');
+    console.log('  3. Choose "ENEX format (.enex)" and save the file.');
+    console.log('  4. Repeat for each notebook you want to import.');
+    console.log('  5. Put all the .enex files into one folder.');
+    console.log('');
 
     let enexFiles = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      let dirInput = await ask('Where are your .enex files? (folder path): ');
+      let dirInput = await ask('Step 2 of 3 — Where are your .enex files? (folder path): ');
       dirInput = dirInput.trim();
 
       if (!dirInput) {
@@ -138,20 +209,35 @@ async function interactiveSetup({ dryRun = false } = {}) {
     }
 
     if (!enexFiles) {
-      console.error('Too many failed attempts. Run --help for usage.');
+      console.error('Too many failed attempts.');
+      console.error('Run: evernote-to-onenote --help  for usage instructions.');
       rl.close();
       process.exit(1);
     }
 
-    console.log(`\nFound ${enexFiles.length} notebook(s):`);
-    enexFiles.forEach(f => console.log(`  • ${path.basename(f)}`));
+    console.log('');
+    console.log('─────────────────────────────────────────────');
+    console.log('Step 2 of 3: Review what will be imported');
+    console.log('─────────────────────────────────────────────');
+    console.log('');
+    console.log(`Found ${enexFiles.length} notebook(s):`);
+    enexFiles.forEach(f => console.log(`  • ${path.basename(f, '.enex')}`));
+    console.log('');
+
+    if (dryRun) {
+      console.log('PREVIEW mode: this run will show what would be imported without changing anything.');
+    } else {
+      console.log('IMPORT mode: notes will be created in your Microsoft OneNote account.');
+      console.log('Progress is saved after every note — if interrupted, run with --resume to continue.');
+    }
+    console.log('');
 
     const action = dryRun ? 'preview' : 'import';
-    const confirm = await ask(`\nStart ${action} of ${enexFiles.length} notebook(s)? [Y/n] `);
+    const confirm = await ask(`Start ${action} of ${enexFiles.length} notebook(s)? [Y/n] `);
     rl.close();
 
     if (confirm.trim().toLowerCase() === 'n') {
-      console.log('Cancelled.');
+      console.log('Cancelled. Your files were not changed.');
       process.exit(0);
     }
 

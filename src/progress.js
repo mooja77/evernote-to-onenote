@@ -13,11 +13,27 @@ function loadProgress() {
   try {
     raw = JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8'));
   } catch {
+    console.warn('  ⚠ progress.json could not be read (corrupt or truncated). Starting fresh.');
+    console.warn('    If you had a partial import, run --verify after the next import to reconcile.');
     return { version: 2, files: {} };
   }
+
+  // Schema sanity checks — guard against partially-written or hand-edited files.
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    console.warn('  ⚠ progress.json has unexpected structure. Starting fresh.');
+    return { version: 2, files: {} };
+  }
+
   if (!raw.version || raw.version < 2) {
     return _migrateV1(raw);
   }
+
+  // Ensure files map is present and is an object.
+  if (!raw.files || typeof raw.files !== 'object' || Array.isArray(raw.files)) {
+    console.warn('  ⚠ progress.json is missing the files map. Starting fresh.');
+    return { version: 2, files: {} };
+  }
+
   return raw;
 }
 

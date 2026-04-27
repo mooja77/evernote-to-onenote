@@ -365,7 +365,7 @@ describe('interactiveSetup — mocked readline', () => {
     try {
       const { interactiveSetup } = require('../src/ui');
       await interactiveSetup();
-      assert.ok(logged.some(l => l.includes('my-notebook.enex')), 'should list the found notebook');
+      assert.ok(logged.some(l => l.includes('my-notebook')), 'should list the found notebook');
       assert.ok(logged.some(l => l.includes('1')), 'should show count of notebooks');
     } finally {
       console.log = origLog;

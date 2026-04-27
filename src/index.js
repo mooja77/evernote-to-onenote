@@ -358,44 +358,73 @@ async function main() {
 
   if (args.includes('--auth')) {
     await runAuthFlow();
-    console.log('\nAuthentication complete. Token cached — you can now run the importer.');
+    console.log('\n─────────────────────────────────────────────');
+    console.log('Sign-in complete.');
+    console.log('');
+    console.log('Next step — preview your notes before importing:');
+    console.log('  evernote-to-onenote --batch <folder-with-enex-files> --dry-run');
+    console.log('');
+    console.log('Replace <folder-with-enex-files> with the path to the folder');
+    console.log('containing your exported .enex files.');
     process.exit(0);
   }
 
   if (args.includes('--help')) {
     console.log([
+      'Evernote → OneNote Importer',
+      '',
+      'Moves your Evernote notebooks (.enex files) into Microsoft OneNote.',
+      'Nothing is deleted from Evernote. Progress is saved after every note.',
+      '',
+      'Requirements:',
+      '  • Node.js 20 or later',
+      '  • A personal Microsoft account (Outlook.com / Hotmail / Live)',
+      '    ⚠  Work/school accounts (Microsoft 365 / Entra ID) are NOT supported.',
+      '  • Evernote notebooks exported as .enex files',
+      '    (Evernote → right-click notebook → Export Notebook → ENEX format)',
+      '',
+      'First-time setup (3 steps):',
+      '  Step 1 — Sign in to Microsoft:',
+      '    evernote-to-onenote --auth',
+      '  Step 2 — Preview what will be imported (nothing is written to OneNote):',
+      '    evernote-to-onenote --batch ./Evernote-Export --dry-run',
+      '  Step 3 — Run the import:',
+      '    evernote-to-onenote --batch ./Evernote-Export',
+      '',
+      'Optional step — verify the import completed:',
+      '    evernote-to-onenote --verify',
+      '',
+      'Not technical? Run with no arguments for a step-by-step guided experience:',
+      '    evernote-to-onenote',
+      '',
       'Usage:',
-      '  evernote-to-onenote --auth                     Authenticate with Microsoft (first-time setup)',
-      '  evernote-to-onenote --batch <dir> --dry-run    Preview what will be imported (no data sent)',
+      '  evernote-to-onenote --auth                     Sign in to Microsoft (once)',
+      '  evernote-to-onenote --batch <dir> --dry-run    Preview (no data sent to OneNote)',
       '  evernote-to-onenote --batch <dir>              Run the import',
-      '  evernote-to-onenote --verify                   Reconcile progress.json vs OneNote',
-      '  evernote-to-onenote                            Guided mode (prompts for folder path)',
+      '  evernote-to-onenote --verify                   Check import completed correctly',
+      '  evernote-to-onenote                            Guided step-by-step mode',
       '',
-      'Recommended first-run flow:',
-      '  1. evernote-to-onenote --auth',
-      '  2. evernote-to-onenote --batch ./Evernote-Export --dry-run',
-      '  3. evernote-to-onenote --batch ./Evernote-Export',
-      '  4. evernote-to-onenote --verify',
-      '',
-      'Options:',
-      '  --guided               Enter guided setup (prompts for folder path; same as no-argument mode)',
-      '  --dry-run              Preview import without calling the OneNote write API',
-      '  --report <path>        Save dry-run summary to a file (default: ./dry-run-report.txt)',
-      '  --no-report            Do not write a dry-run report file',
-      '  --batch <dir>          Import all .enex files from a directory',
-      '  --resume               Skip already-imported notes (verified via OneNote API)',
-      '  --force-reimport       Re-import even if already recorded in progress.json',
-      '  --year-sections        Organise notes into sections by year (e.g. 2014, 2015)',
-      '  --verify               Print reconciliation table vs OneNote (can be standalone)',
-      '  --output-html <dir>    Export converted HTML to a folder (no API needed)',
-      '  --tags-strategy <s>    How to migrate tags: page-metadata (default) or section-groups',
-      '  --on-conflict <mode>   Duplicate page handling: skip (default), rename, overwrite, ask',
-      '  --concurrency <N>      Parallel notes per notebook (default: 3, max: 10)',
-      '  --no-preserve-metadata Omit creation date, author, and source URL from page headers',
-      '  --notebooks <pattern>  Comma-separated list or glob pattern to filter notebooks in batch mode',
-      '  --date-range <range>   Only import notes in range, e.g. 2020-01-01..2023-12-31',
-      '  --quiet                Suppress per-note progress output (for CI/scripted use)',
-      '  --auth                 Authenticate with Microsoft and cache token, then exit',
+      'All options:',
+      '  --guided               Step-by-step prompts (same as running with no arguments)',
+      '  --auth                 Sign in to Microsoft and save your session, then exit',
+      '  --batch <dir>          Import all .enex files in a folder',
+      '  --dry-run              Preview what would be imported — nothing is written to OneNote',
+      '  --report <path>        Save the dry-run summary to a file (default: ./dry-run-report.txt)',
+      '  --no-report            Skip writing the dry-run report file',
+      '  --resume               Skip notes already imported (checks OneNote to confirm)',
+      '  --force-reimport       Re-import all notes even if already in progress.json',
+      '  --verify               Compare progress.json against live OneNote page counts',
+      '  --year-sections        Organise notes by year (sections: 2018, 2019, …)',
+      '  --output-html <dir>    Save notes as HTML files locally (no Microsoft account needed)',
+      '  --tags-strategy <s>    Tags as: page-metadata (default, #hashtag footer) or section-groups',
+      '  --on-conflict <mode>   If a page title already exists: skip (default), rename, overwrite, ask',
+      '  --concurrency <N>      Number of notes to import at once (default: 3, max: 10)',
+      '  --notebooks <pattern>  Only import notebooks matching a pattern: --notebooks "Work-*,Personal"',
+      '  --date-range <range>   Only import notes in a date range: --date-range 2020-01-01..2023-12-31',
+      '  --no-preserve-metadata Omit creation date, author, source URL from page headers',
+      '  --quiet                Suppress per-note output (for scripts/CI)',
+      '  --version              Print version and exit',
+      '  --help                 Show this help',
     ].join('\n'));
     process.exit(0);
   }
@@ -412,8 +441,14 @@ async function main() {
   if ((args.length === 0 && process.stdin.isTTY) || args.includes('--guided')) {
     interactiveFiles = await interactiveSetup({ dryRun });
   } else if (args.length === 0) {
-    console.log('Usage: evernote-to-onenote --batch <dir> --dry-run');
-    console.log('Run evernote-to-onenote --help for all options.');
+    console.log('Evernote → OneNote Importer');
+    console.log('');
+    console.log('First-time? Start here:');
+    console.log('  evernote-to-onenote --auth                          Sign in to Microsoft');
+    console.log('  evernote-to-onenote --batch <dir> --dry-run         Preview (no changes)');
+    console.log('  evernote-to-onenote --batch <dir>                   Run the import');
+    console.log('');
+    console.log('Run evernote-to-onenote --help for all options and requirements.');
     process.exit(0);
   }
 
@@ -531,9 +566,11 @@ async function main() {
       const msalCachePath = path.resolve(__dirname, '..', 'msal-cache.json');
       const hasCacheFile = fs.existsSync(msalCachePath);
       if (!hasCacheFile && (process.env.MSAL_NO_INTERACTIVE === '1' || !process.stdout.isTTY)) {
-        console.error('Error: No access token found. Options:');
-        console.error('  1. Run: node src/index.js --auth  (Microsoft device-code flow)');
-        console.error('  2. Set: ONENOTE_ACCESS_TOKEN=<token>');
+        console.error('Error: You are not signed in to Microsoft.');
+        console.error('  Run this first: evernote-to-onenote --auth');
+        console.error('');
+        console.error('  Note: only personal Microsoft accounts are supported');
+        console.error('  (Outlook.com / Hotmail / Live). Work/school accounts are not supported.');
         process.exit(1);
       }
       getToken = () => getAuthenticatedToken();
@@ -541,9 +578,13 @@ async function main() {
       try {
         await getToken();
       } catch (err) {
-        console.error(`Error: Authentication failed — ${err.message}`);
-        console.error('  Run: node src/index.js --auth to re-authenticate');
-        console.error('  Or set ONENOTE_ACCESS_TOKEN env var');
+        const hint = describeError(err);
+        console.error(`Error: Sign-in failed — ${err.message}`);
+        if (hint) {
+          console.error(hint);
+        } else {
+          console.error('  Run: evernote-to-onenote --auth to sign in again');
+        }
         process.exit(1);
       }
     }
@@ -560,20 +601,29 @@ async function main() {
 
   const mode = outputHtmlDir
     ? `HTML output → ${path.resolve(outputHtmlDir)}`
-    : dryRun ? 'DRY RUN (no API calls)' : 'LIVE';
+    : dryRun ? 'DRY RUN (no API calls)' : 'LIVE IMPORT';
 
   console.log(`\nEvernote → OneNote Importer`);
-  console.log(`  Files:    ${enexFiles.length}`);
+  if (dryRun) {
+    console.log('');
+    console.log('  ╔══════════════════════════════════════════════╗');
+    console.log('  ║  DRY RUN — nothing will be written to OneNote  ║');
+    console.log('  ╚══════════════════════════════════════════════╝');
+    console.log('  This is a safe preview. No Microsoft API calls will be made.');
+    console.log('  Remove --dry-run when you are ready to import for real.');
+  }
+  console.log('');
+  console.log(`  Files:    ${enexFiles.length} notebook(s)`);
   console.log(`  Mode:     ${mode}`);
-  console.log(`  Parallel: ${concurrency} note(s) per notebook`);
-  if (yearSections) console.log(`  Sections: by year`);
+  if (!dryRun && !outputHtmlDir) console.log(`  Workers:  ${concurrency} note(s) in parallel`);
+  if (yearSections) console.log(`  Sections: organised by year`);
   console.log(`  Tags:     ${tagsStrategy}`);
-  if (onConflict) console.log(`  Conflicts: ${onConflict}`);
-  if (resume) console.log(`  Resume:   enabled (with OneNote verification)`);
-  if (forceReimport) console.log(`  Force:    re-importing all notes`);
-  if (!preserveMetadata) console.log(`  Metadata: disabled`);
-  if (notebooksPattern) console.log(`  Notebooks filter: ${notebooksPattern}`);
-  if (dateRange) console.log(`  Date range: ${dateRange.start} .. ${dateRange.end}`);
+  if (onConflict) console.log(`  On conflict: ${onConflict}`);
+  if (resume) console.log(`  Resume:   on (will skip notes already verified in OneNote)`);
+  if (forceReimport) console.log(`  Force:    on (will re-import all notes regardless of progress.json)`);
+  if (!preserveMetadata) console.log(`  Metadata: off (creation date, author, source URL will not be saved)`);
+  if (notebooksPattern) console.log(`  Filter:   notebooks matching "${notebooksPattern}"`);
+  if (dateRange) console.log(`  Date range: ${dateRange.start} → ${dateRange.end}`);
   console.log('');
 
   let totalSucceeded = 0, totalFailed = 0, totalSkipped = 0;
@@ -663,31 +713,63 @@ async function main() {
     totalSkipped += skipped;
   }
 
-  console.log(`\n─────────────────────────────────`);
-  console.log(`Done.`);
-  console.log(`  Imported: ${totalSucceeded}`);
-  if (totalSkipped > 0) console.log(`  Skipped:  ${totalSkipped}`);
-  if (totalFailed > 0) console.log(`  Failed:   ${totalFailed}`);
-  if (dryRun) console.log('\n(Dry-run complete — no data was sent to OneNote)');
+  console.log(`\n─────────────────────────────────────────────`);
+  if (dryRun) {
+    const totalNotesDryRun = notebookSummaries.reduce((s, n) => s + n.count, 0);
+    console.log('DRY RUN complete — nothing was written to OneNote.');
+    console.log('');
+    console.log('What would be imported:');
+    notebookSummaries.forEach(n => {
+      console.log(`  • ${n.name.padEnd(38)} ${n.count} note(s)`);
+    });
+    console.log('');
+    console.log(`  Total: ${totalNotesDryRun} note(s) across ${notebookSummaries.length} notebook(s)`);
+    console.log('');
+    console.log(`  Imported: ${totalSucceeded}`);
+    if (totalSkipped > 0) console.log(`  Skipped:  ${totalSkipped}`);
+    if (totalFailed > 0) console.log(`  Failed:   ${totalFailed}`);
+    console.log('');
+    console.log('When you are ready to import for real, remove --dry-run:');
+    console.log('  evernote-to-onenote --batch <dir>');
+  } else {
+    console.log('Done.');
+    console.log(`  Imported: ${totalSucceeded}`);
+    if (totalSkipped > 0) console.log(`  Skipped:  ${totalSkipped}`);
+    if (totalFailed > 0) {
+      console.log(`  Failed:   ${totalFailed}`);
+      console.log('');
+      console.log('Some notes failed. To retry failed notes, run:');
+      console.log('  evernote-to-onenote --batch <dir> --resume');
+    }
+    if (totalFailed === 0 && totalSucceeded > 0) {
+      console.log('');
+      console.log('All done! Your notes are in OneNote.');
+      console.log('Run --verify to confirm everything arrived:');
+      console.log('  evernote-to-onenote --verify');
+    }
+  }
 
   if (dryRun && !noReport) {
     const totalNotes = notebookSummaries.reduce((s, n) => s + n.count, 0);
     const lines = [
-      'Evernote → OneNote  Dry-Run Report',
+      'Evernote → OneNote — Dry-Run Report',
       `Generated: ${new Date().toISOString()}`,
       '',
-      `Notebooks previewed (${notebookSummaries.length}):`,
+      'IMPORTANT: This is a preview only. No data was sent to Microsoft.',
+      '',
+      `Notebooks that would be imported (${notebookSummaries.length}):`,
       ...notebookSummaries.map(n => `  ${n.name.padEnd(40)} ${n.count} note(s)`),
       '',
       `Total: ${totalNotes} note(s) across ${notebookSummaries.length} notebook(s)`,
       '',
-      'No data was sent to Microsoft.',
-      'Run without --dry-run to import, or use --help for options.',
+      'To run the actual import, remove --dry-run:',
+      '  evernote-to-onenote --batch <dir>',
     ];
     try {
       const reportDir = path.dirname(reportPath);
       if (reportDir) fs.mkdirSync(reportDir, { recursive: true });
       fs.writeFileSync(reportPath, lines.join('\n') + '\n', 'utf8');
+      console.log('');
       console.log(`Dry-run report saved to: ${reportPath}`);
     } catch (reportErr) {
       console.warn(`Warning: could not write dry-run report: ${reportErr.message}`);

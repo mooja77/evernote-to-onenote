@@ -31,7 +31,7 @@ describe('CLI — argument handling', () => {
   test('prints usage and exits 0 with no arguments', () => {
     const { status, stdout } = run([]);
     assert.equal(status, 0);
-    assert.match(stdout, /Usage/i);
+    assert.match(stdout, /evernote-to-onenote --help/i);
   });
 
   test('prints usage and exits 0 with --help', () => {
@@ -58,7 +58,7 @@ describe('CLI — argument handling', () => {
       env: { ONENOTE_ACCESS_TOKEN: '', MSAL_NO_INTERACTIVE: '1' },
     });
     assert.equal(status, 1);
-    assert.match(stderr, /ONENOTE_ACCESS_TOKEN/);
+    assert.match(stderr, /signed in|auth/i);
   });
 });
 
@@ -70,7 +70,7 @@ describe('CLI — dry-run mode', () => {
       assert.equal(status, 0);
       assert.match(stdout, /1 note\(s\) found/);
       assert.match(stdout, /Single Note/);
-      assert.match(stdout, /Dry-run complete/i);
+      assert.match(stdout, /DRY RUN complete/i);
     } finally {
       fs.rmSync(cwdDir, { recursive: true, force: true });
     }
@@ -325,7 +325,7 @@ describe('CLI — --verify (standalone mode)', () => {
     }
   });
 
-  test('--verify requires a token (exits 1 with ONENOTE_ACCESS_TOKEN message when no token)', () => {
+  test('--verify requires a token (exits 1 with sign-in error when no token)', () => {
     const cwdDir = makeTempDir('verify-no-token');
     try {
       // Write a minimal progress.json so verify proceeds past the "no files" check
@@ -336,7 +336,7 @@ describe('CLI — --verify (standalone mode)', () => {
       fs.writeFileSync(path.join(cwdDir, 'progress.json'), JSON.stringify(progressData, null, 2));
       const { status, stderr } = run(['--verify'], { cwd: cwdDir });
       assert.equal(status, 1);
-      assert.match(stderr, /ONENOTE_ACCESS_TOKEN|token/i);
+      assert.match(stderr, /signed in|auth/i);
     } finally {
       fs.rmSync(cwdDir, { recursive: true, force: true });
     }
@@ -620,7 +620,7 @@ describe('CLI — --on-conflict', () => {
     try {
       const { status, stdout } = run([fix('single-note.enex'), '--dry-run', '--on-conflict'], { cwd: cwdDir });
       assert.equal(status, 0);
-      assert.match(stdout, /Conflicts.*skip/i);
+      assert.match(stdout, /conflict.*skip/i);
     } finally {
       fs.rmSync(cwdDir, { recursive: true, force: true });
     }

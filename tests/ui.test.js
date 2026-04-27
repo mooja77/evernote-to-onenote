@@ -140,7 +140,7 @@ describe('describeError', () => {
   test('503 suggests retrying later', () => {
     const hint = describeError(new Error('OneNote API 503 after max retries'));
     assert.ok(hint, 'should return a hint');
-    assert.match(hint, /retry/i);
+    assert.match(hint, /try again|resume/i);
   });
 
   test('unrecognised error returns null', () => {
