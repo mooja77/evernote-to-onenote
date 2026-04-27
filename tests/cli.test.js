@@ -40,6 +40,14 @@ describe('CLI — argument handling', () => {
     assert.match(stdout, /Usage/i);
   });
 
+  test('prints package version and exits 0 with --version', () => {
+    const { status, stdout, stderr } = run(['--version']);
+    const { version } = require('../package.json');
+    assert.equal(status, 0);
+    assert.equal(stderr, '');
+    assert.equal(stdout.trim(), version);
+  });
+
   test('exits 1 with an error when file does not end in .enex', () => {
     const { status, stderr } = run(['notes.txt', '--dry-run']);
     assert.equal(status, 1);
