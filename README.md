@@ -11,7 +11,7 @@ A transparent, scriptable, resumable CLI from JMS Dev Lab that migrates your ent
 ## Install
 
 ```sh
-npm install -g github:mooja77/evernote-to-onenote
+npm install -g evernote-to-onenote
 ```
 
 Requires Node.js 20 or later. No other runtime dependencies.
