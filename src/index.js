@@ -13,6 +13,7 @@ const { loadProgress, saveProgress, markImported, isImported, verifyImport } = r
 const { applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES } = require('./tags');
 const { createGlobalBackoff, createWriteQueue, runParallel } = require('./parallel');
 const { ProgressBar, describeError, interactiveSetup } = require('./ui');
+const { version } = require('../package.json');
 
 const FLAGS_WITH_VALUES = ['--batch', '--output-html', '--tags-strategy', '--on-conflict', '--concurrency', '--notebooks', '--date-range', '--report'];
 const MAX_CONCURRENCY = 10;
@@ -366,6 +367,11 @@ async function main() {
     console.log('');
     console.log('Replace <folder-with-enex-files> with the path to the folder');
     console.log('containing your exported .enex files.');
+    process.exit(0);
+  }
+
+  if (args.includes('--version')) {
+    console.log(version);
     process.exit(0);
   }
 
