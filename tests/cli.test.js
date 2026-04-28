@@ -38,6 +38,7 @@ describe('CLI — argument handling', () => {
     const { status, stdout } = run(['--help']);
     assert.equal(status, 0);
     assert.match(stdout, /Usage/i);
+    assert.match(stdout, /evernote-to-onenote setup/);
   });
 
   test('prints package version and exits 0 with --version', () => {
@@ -384,6 +385,31 @@ describe('CLI — --guided flag', () => {
       );
       assert.equal(status, 0, `stdout: ${stdout}`);
       assert.match(stdout, /1 note\(s\) found/);
+    } finally {
+      fs.rmSync(batchDir, { recursive: true, force: true });
+      fs.rmSync(cwdDir, { recursive: true, force: true });
+    }
+  });
+
+  test('setup command runs the beginner guided dry-run path', () => {
+    const batchDir = makeTempDir('setup-in');
+    const cwdDir = makeTempDir('setup-cwd');
+    try {
+      fs.copyFileSync(fix('single-note.enex'), path.join(batchDir, 'single-note.enex'));
+      const { status, stdout, stderr } = spawnSync(
+        process.execPath,
+        [CLI, 'setup', '--no-report'],
+        {
+          encoding: 'utf8',
+          input: batchDir + '\ny\n',
+          env: { ...process.env, ONENOTE_ACCESS_TOKEN: '', MSAL_NO_INTERACTIVE: '1' },
+          timeout: 15000,
+          cwd: cwdDir,
+        }
+      );
+      assert.equal(status, 0, `stdout: ${stdout}\nstderr: ${stderr}`);
+      assert.match(stdout, /Step 3 of 4: Microsoft and OneDrive preflight/);
+      assert.match(stdout, /DRY RUN complete/i);
     } finally {
       fs.rmSync(batchDir, { recursive: true, force: true });
       fs.rmSync(cwdDir, { recursive: true, force: true });

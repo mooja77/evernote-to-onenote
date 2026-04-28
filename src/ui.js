@@ -116,7 +116,13 @@ function describeError(err) {
 // Prompts the user interactively for a .enex directory and start confirmation.
 // Re-prompts on invalid input (up to MAX_ATTEMPTS) so beginners are not
 // dropped out on the first mistake. Returns an array of resolved .enex paths.
-async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
+async function interactiveSetup({
+  dryRun = false,
+  exit = process.exit,
+  setupMode = false,
+  hasSavedSession = false,
+  nodeVersion = process.version,
+} = {}) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const MAX_ATTEMPTS = 5;
   let ask;
@@ -154,8 +160,10 @@ async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
     console.log('');
     console.log('This tool moves your Evernote notes into Microsoft OneNote.');
     console.log('Nothing is deleted from Evernote — it only creates new pages in OneNote.');
+    console.log('Progress is saved after every note, so it is safe to resume later.');
     console.log('');
     console.log('What you will need:');
+    console.log(`  ✓ Node.js 20 or later (${nodeVersion} detected)`);
     console.log('  • A personal Microsoft account (Outlook.com / Hotmail / Live)');
     console.log('    Work/school accounts (Microsoft 365) are NOT supported.');
     console.log('  • Your Evernote notebooks exported as .enex files (see below)');
@@ -190,7 +198,7 @@ async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
     }
 
     console.log('─────────────────────────────────────────────');
-    console.log('Step 1 of 3: Export your notebooks from Evernote');
+    console.log('Step 1 of 4: Export your notebooks from Evernote');
     console.log('─────────────────────────────────────────────');
     console.log('');
     console.log('  1. Open Evernote on your computer.');
@@ -204,7 +212,7 @@ async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
     let enexFiles = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      let dirInput = await ask('Step 2 of 3 — Where are your .enex files? (folder path): ');
+      let dirInput = await ask('Step 2 of 4 — Where are your .enex files? (folder path): ');
       dirInput = dirInput.trim();
 
       if (!dirInput) {
@@ -246,7 +254,25 @@ async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
 
     console.log('');
     console.log('─────────────────────────────────────────────');
-    console.log('Step 2 of 3: Review what will be imported');
+    console.log('Step 3 of 4: Microsoft and OneDrive preflight');
+    console.log('─────────────────────────────────────────────');
+    console.log('');
+    if (hasSavedSession) {
+      console.log('  ✓ A saved Microsoft sign-in was found on this machine.');
+    } else {
+      console.log('  • No saved Microsoft sign-in was found yet.');
+      console.log('    Before the real import, run: evernote-to-onenote --auth');
+    }
+    console.log('  • Use a personal Microsoft account only (Outlook.com / Hotmail / Live).');
+    console.log('  • Check OneDrive has enough free space before a large migration.');
+    console.log('  • This guided run starts with a dry-run preview, so no sign-in is needed yet.');
+    if (setupMode) {
+      console.log('  • After this setup preview, you can run the printed import command when ready.');
+    }
+    console.log('');
+
+    console.log('─────────────────────────────────────────────');
+    console.log('Step 4 of 4: Review what will be imported');
     console.log('─────────────────────────────────────────────');
     console.log('');
     console.log(`Found ${enexFiles.length} notebook(s):`);

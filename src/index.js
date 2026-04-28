@@ -20,6 +20,32 @@ const MAX_CONCURRENCY = 10;
 
 const VALID_CONFLICT_MODES = ['skip', 'rename', 'overwrite', 'ask'];
 
+function checkNodeVersion({ exit = process.exit, stdout = console.log, stderr = console.error } = {}) {
+  const [major] = process.versions.node.split('.').map(Number);
+  if (major < 18) {
+    stderr(`Error: Node.js 20 or later is required. You are running ${process.version}.`);
+    stderr('');
+    stderr('Download the LTS version from: https://nodejs.org');
+    stderr('Then re-run: evernote-to-onenote');
+    exit(1);
+    return false;
+  }
+  if (major < 20) {
+    stdout(`Warning: Node.js ${major} detected. This tool requires Node.js 20 or later.`);
+    stdout('Upgrade at: https://nodejs.org');
+    stdout('');
+  }
+  return true;
+}
+
+function hasSavedMicrosoftSession() {
+  return Boolean(
+    process.env.ONENOTE_ACCESS_TOKEN ||
+    fs.existsSync(path.resolve(__dirname, '..', '.access-token')) ||
+    fs.existsSync(path.resolve(__dirname, '..', 'msal-cache.json'))
+  );
+}
+
 function sanitizeName(name) {
   return name
     .replace(/[\x00-\x1f]/g, '')    // strip null bytes and control chars (invalid in filenames)
@@ -399,7 +425,13 @@ async function runVerify(client, progress, enexFiles, { quiet = false, _exit = p
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  if (!checkNodeVersion()) return;
+
+  let args = process.argv.slice(2);
+  const setupRequested = args[0] === 'setup';
+  if (setupRequested) {
+    args = ['--guided', ...args.slice(1)];
+  }
 
   if (args.includes('--auth')) {
     await runAuthFlow();
@@ -434,6 +466,9 @@ async function main() {
       '    (Evernote → right-click notebook → Export Notebook → ENEX format)',
       '',
       'First-time setup (3 steps):',
+      '  Not technical? Use the setup helper:',
+      '    evernote-to-onenote setup',
+      '',
       '  Step 1 — Sign in to Microsoft:',
       '    evernote-to-onenote --auth',
       '  Step 2 — Preview what will be imported (nothing is written to OneNote):',
@@ -453,6 +488,7 @@ async function main() {
       '  evernote-to-onenote --batch <dir>              Run the import',
       '  evernote-to-onenote --verify                   Check import completed correctly',
       '  evernote-to-onenote                            Guided step-by-step mode',
+      '  evernote-to-onenote setup                      Beginner setup helper',
       '',
       'All options:',
       '  --guided               Step-by-step prompts; starts with a safe preview',
@@ -476,6 +512,9 @@ async function main() {
       '  --quiet                Suppress per-note output (for scripts/CI)',
       '  --version              Print version and exit',
       '  --help                 Show this help',
+      '',
+      'Windows help:',
+      '  https://github.com/mooja77/evernote-to-onenote/blob/master/docs/WINDOWS-TROUBLESHOOTING.md',
     ].join('\n'));
     process.exit(0);
   }
@@ -497,11 +536,17 @@ async function main() {
       console.log('Guided mode starts with a safe preview. Nothing will be written to OneNote.');
       console.log('After checking the report, run the printed import command when you are ready.');
     }
-    interactiveFiles = await interactiveSetup({ dryRun });
+    interactiveFiles = await interactiveSetup({
+      dryRun,
+      setupMode: setupRequested,
+      hasSavedSession: hasSavedMicrosoftSession(),
+      nodeVersion: process.version,
+    });
   } else if (args.length === 0 || (noInteractive && args.length === 1)) {
     console.log('Evernote → OneNote Importer');
     console.log('');
     console.log('First-time? Start here:');
+    console.log('  evernote-to-onenote setup                         Beginner setup helper');
     console.log('  evernote-to-onenote --auth                          Sign in to Microsoft');
     console.log('  evernote-to-onenote --batch <dir> --dry-run         Preview (no changes)');
     console.log('  evernote-to-onenote --batch <dir>                   Run the import');
@@ -854,6 +899,8 @@ if (require.main === module) {
 module.exports = {
   importNotes,
   runVerify,
+  checkNodeVersion,
+  hasSavedMicrosoftSession,
   matchNotebookPattern,
   parseDateRange,
   enexDateToIso,

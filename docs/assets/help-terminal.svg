@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="560" viewBox="0 0 980 560" role="img" aria-labelledby="title desc">
+  <title id="title">Evernote to OneNote help command screenshot</title>
+  <desc id="desc">A terminal screenshot showing the beginner-friendly help output for the Evernote to OneNote migration tool.</desc>
+  <rect width="980" height="560" rx="24" fill="#0f172a"/>
+  <rect x="0" y="0" width="980" height="48" rx="24" fill="#111827"/>
+  <circle cx="30" cy="24" r="7" fill="#ef4444"/><circle cx="54" cy="24" r="7" fill="#f59e0b"/><circle cx="78" cy="24" r="7" fill="#22c55e"/>
+  <text x="490" y="31" fill="#cbd5e1" font-family="Consolas, 'Courier New', monospace" font-size="15" text-anchor="middle">PowerShell - evernote-to-onenote --help</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="20" fill="#e5e7eb">
+    <text x="34" y="88" fill="#93c5fd">PS&gt; evernote-to-onenote --help</text>
+    <text x="34" y="132" font-size="26" fill="#f8fafc">Evernote -> OneNote Importer</text>
+    <text x="34" y="168">Moves your Evernote notebooks (.enex files) into Microsoft OneNote.</text>
+    <text x="34" y="198">Nothing is deleted from Evernote. Progress is saved after every note.</text>
+    <text x="34" y="246" fill="#a7f3d0">First-time setup:</text>
+    <text x="58" y="282">1. evernote-to-onenote setup</text>
+    <text x="58" y="314">2. evernote-to-onenote --auth</text>
+    <text x="58" y="346">3. evernote-to-onenote --batch ./Evernote-Export --dry-run</text>
+    <text x="58" y="378">4. evernote-to-onenote --batch ./Evernote-Export</text>
+    <text x="34" y="430" fill="#fde68a">Safe by default: setup starts with a preview only.</text>
+    <text x="34" y="466">Use a personal Microsoft account: Outlook.com, Hotmail, or Live.</text>
+    <text x="34" y="498">Run --verify after import to check page counts.</text>
+  </g>
+</svg>

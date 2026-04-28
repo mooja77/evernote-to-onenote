@@ -27,6 +27,18 @@ npm install -g evernote-to-onenote
 
 ---
 
+## Easiest start
+
+If you are not technical, run the setup helper. It checks the basics, asks for your Evernote export folder, and starts with a safe preview only:
+
+```sh
+evernote-to-onenote setup
+```
+
+Nothing is written to OneNote during the setup preview. When the report looks right, the tool prints the exact import command to run next.
+
+---
+
 ## First-time setup: 3 steps
 
 ### Step 1 — Export your notebooks from Evernote
@@ -147,6 +159,8 @@ Options:
 
 ## What it looks like
 
+![Evernote to OneNote help screenshot](https://raw.githubusercontent.com/mooja77/evernote-to-onenote/master/docs/assets/help-terminal.svg)
+
 Running `--help`:
 
 ```
@@ -174,6 +188,8 @@ First-time setup (3 steps):
 ```
 
 Running a dry-run preview on a folder of `.enex` files (output from `node src/index.js --batch tests/fixtures --dry-run`):
+
+![Evernote to OneNote dry-run screenshot](https://raw.githubusercontent.com/mooja77/evernote-to-onenote/master/docs/assets/dry-run-terminal.svg)
 
 ```
 $ evernote-to-onenote --batch ./Evernote-Export --dry-run

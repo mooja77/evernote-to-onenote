@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="640" viewBox="0 0 980 640" role="img" aria-labelledby="title desc">
+  <title id="title">Evernote to OneNote dry-run preview screenshot</title>
+  <desc id="desc">A terminal screenshot showing a dry-run preview summary with no Microsoft API calls.</desc>
+  <rect width="980" height="640" rx="24" fill="#082f49"/>
+  <rect x="0" y="0" width="980" height="48" rx="24" fill="#0c4a6e"/>
+  <circle cx="30" cy="24" r="7" fill="#ef4444"/><circle cx="54" cy="24" r="7" fill="#f59e0b"/><circle cx="78" cy="24" r="7" fill="#22c55e"/>
+  <text x="490" y="31" fill="#bae6fd" font-family="Consolas, 'Courier New', monospace" font-size="15" text-anchor="middle">PowerShell - dry-run preview</text>
+  <g font-family="Consolas, 'Courier New', monospace" font-size="19" fill="#ecfeff">
+    <text x="34" y="88" fill="#bae6fd">PS&gt; evernote-to-onenote --batch .\Evernote-Export --dry-run</text>
+    <text x="34" y="132" font-size="26" fill="#ffffff">Evernote -> OneNote Importer</text>
+    <text x="34" y="178" fill="#fde68a">DRY RUN - nothing will be written to OneNote</text>
+    <text x="34" y="214">Files:    3 notebook(s)</text>
+    <text x="34" y="246">Mode:     DRY RUN (no API calls)</text>
+    <text x="34" y="278">Tags:     page-metadata</text>
+    <text x="34" y="330">Importing file 1/3: Work.enex -> notebook "Work"</text>
+    <text x="58" y="362">124 note(s) found</text>
+    <text x="58" y="394">[dry-run] Would create notebook: "Work"</text>
+    <text x="34" y="446" fill="#a7f3d0">DRY RUN complete - no data was sent to Microsoft.</text>
+    <text x="34" y="494">What would be imported:</text>
+    <text x="58" y="528">* Work                                  124 note(s)</text>
+    <text x="58" y="560">* Personal                               48 note(s)</text>
+    <text x="58" y="592">* Recipes                                12 note(s)</text>
+    <text x="34" y="624" fill="#fde68a">Total: 184 notes across 3 notebooks. Report saved to dry-run-report.txt</text>
+  </g>
+</svg>
