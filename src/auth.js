@@ -87,7 +87,9 @@ async function getAuthenticatedToken({ noInteractive = false } = {}) {
         (typeof err.message === 'string' && err.message.includes('invalid_grant'));
 
       if (isInvalidGrant) {
-        console.warn('  ⚠ Your saved login has expired. You will be asked to sign in again.');
+        if (process.env.NODE_ENV !== 'test') {
+          console.warn('  ⚠ Your saved login has expired. You will be asked to sign in again.');
+        }
         try { fs.unlinkSync(CACHE_FILE); } catch { /* already gone */ }
       }
       // Other silent failures fall through to device-code below
