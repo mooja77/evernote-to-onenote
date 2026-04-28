@@ -87,6 +87,12 @@ Run with no arguments for a step-by-step experience that asks for your folder pa
 evernote-to-onenote
 ```
 
+Need more help before you start? See:
+
+- [How to export Evernote notebooks](docs/EVERNOTE_EXPORT_GUIDE.md)
+- [Clean-install smoke test notes](docs/USER_SMOKE_TEST_2026-04-28.md)
+- [Demo script](docs/DEMO_SCRIPT.md)
+
 ---
 
 ## Features
