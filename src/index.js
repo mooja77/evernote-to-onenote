@@ -318,11 +318,16 @@ async function importNotes({
   return { succeeded: counts.succeeded, failed: counts.failed, skipped: counts.skipped };
 }
 
-async function runVerify(client, progress, enexFiles) {
-  console.log('\nVerifying imported notes against OneNote...\n');
+async function runVerify(client, progress, enexFiles, { quiet = false, _exit = process.exit } = {}) {
+  if (!quiet) console.log('\nVerifying imported notes against OneNote...\n');
   const notebooks = await client.listNotebooks();
   const nbMap = new Map(notebooks.map(n => [n.displayName, n]));
-  let anyMismatch = false;
+
+  let totalSourceNotes = 0;
+  let totalOneNotePages = 0;
+  let totalMatches = 0;
+  let totalMismatches = 0;
+  let totalSkipped = 0;
 
   for (const filePath of enexFiles) {
     const filename = path.basename(filePath);
@@ -332,7 +337,10 @@ async function runVerify(client, progress, enexFiles) {
 
     const nb = nbMap.get(nbName);
     let oneNotePages = 0;
-    if (nb) {
+
+    if (!nb) {
+      totalSkipped++;
+    } else {
       const sections = await client.listSections(nb.id);
       for (const sec of sections) {
         const pages = await client.listPages(sec.id);
@@ -340,18 +348,54 @@ async function runVerify(client, progress, enexFiles) {
       }
     }
 
+    totalSourceNotes += sourceCount;
+    totalOneNotePages += oneNotePages;
+
     const match = sourceCount === oneNotePages;
-    if (!match) anyMismatch = true;
-    const status = match ? '✓' : '✗';
-    console.log(`  ${status} ${filename.padEnd(40)} src:${String(sourceCount).padStart(4)}  onenote:${String(oneNotePages).padStart(4)}`);
+    if (match) {
+      totalMatches++;
+    } else {
+      totalMismatches++;
+    }
+
+    if (!quiet) {
+      const rowStatus = match ? '✓' : '✗';
+      console.log(`  ${rowStatus} ${filename.padEnd(40)} src:${String(sourceCount).padStart(4)}  onenote:${String(oneNotePages).padStart(4)}`);
+    }
   }
 
-  if (anyMismatch) {
-    console.log('\nMismatch detected.');
-    process.exit(1);
-  } else {
-    console.log('\nAll counts match.');
+  const complete = totalMismatches === 0;
+
+  if (quiet) {
+    process.stdout.write(JSON.stringify({
+      notebooks: enexFiles.length,
+      notes: totalSourceNotes,
+      pages: totalOneNotePages,
+      matches: totalMatches,
+      mismatches: totalMismatches,
+      complete,
+    }) + '\n');
+    if (!complete) _exit(1);
+    return;
   }
+
+  console.log('');
+  console.log(`  Notebooks:  ${enexFiles.length}`);
+  console.log(`  Src notes:  ${totalSourceNotes}`);
+  console.log(`  ON pages:   ${totalOneNotePages}`);
+  console.log(`  Matches:    ${totalMatches}`);
+  if (totalMismatches > 0) console.log(`  Mismatches: ${totalMismatches}`);
+  if (totalSkipped > 0) console.log(`  Skipped:    ${totalSkipped} (not found in OneNote)`);
+
+  if (totalMismatches > 0) {
+    console.log('\nMismatch detected.');
+    console.log('Some notes may not have been imported. To retry:');
+    console.log('  evernote-to-onenote --batch <dir> --resume');
+    _exit(1);
+    return;
+  }
+
+  console.log('\nAll counts match. Import is complete.');
 }
 
 async function main() {
@@ -784,7 +828,7 @@ async function main() {
 
   if (verify) {
     const verifyClient = new OneNoteClient({ getToken, dryRun: false });
-    await runVerify(verifyClient, progress, enexFiles);
+    await runVerify(verifyClient, progress, enexFiles, { quiet });
   }
 }
 
@@ -797,6 +841,7 @@ if (require.main === module) {
 
 module.exports = {
   importNotes,
+  runVerify,
   matchNotebookPattern,
   parseDateRange,
   enexDateToIso,

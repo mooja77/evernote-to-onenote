@@ -37,7 +37,7 @@ In Evernote on your computer:
 2. Click **Export Notebook…** (or go to **File → Export Notes**).
 3. Choose **ENEX format (.enex)** and save the file.
 4. Repeat for each notebook you want to move.
-5. Put all the `.enex` files in one folder (e.g. `~/Evernote-Export`).
+5. Put all the `.enex` files in one folder (e.g. `.\Evernote-Export` on Windows or `./Evernote-Export` on Mac/Linux).
 
 ### Step 2 — Sign in to Microsoft (once)
 
@@ -52,7 +52,7 @@ You will see a short URL and a code. Visit the URL, enter the code, and sign in 
 **First, run a dry-run preview.** Nothing will be written to OneNote:
 
 ```sh
-evernote-to-onenote --batch ~/Evernote-Export --dry-run
+evernote-to-onenote --batch .\Evernote-Export --dry-run
 ```
 
 You will see a list of notebooks and note counts. A report is saved to `dry-run-report.txt`. Check it looks right.
@@ -60,13 +60,13 @@ You will see a list of notebooks and note counts. A report is saved to `dry-run-
 **Then run the actual import:**
 
 ```sh
-evernote-to-onenote --batch ~/Evernote-Export
+evernote-to-onenote --batch .\Evernote-Export
 ```
 
 Progress is saved after every note. If anything interrupts it (power cut, network drop), run with `--resume` to pick up where it left off:
 
 ```sh
-evernote-to-onenote --batch ~/Evernote-Export --resume
+evernote-to-onenote --batch .\Evernote-Export --resume
 ```
 
 ### Optional — verify the import completed
@@ -144,6 +144,108 @@ Options:
 
 ---
 
+## What it looks like
+
+Running `--help`:
+
+```
+$ evernote-to-onenote --help
+
+Evernote → OneNote Importer
+
+Moves your Evernote notebooks (.enex files) into Microsoft OneNote.
+Nothing is deleted from Evernote. Progress is saved after every note.
+
+Requirements:
+  • Node.js 20 or later
+  • A personal Microsoft account (Outlook.com / Hotmail / Live)
+    ⚠  Work/school accounts (Microsoft 365 / Entra ID) are NOT supported.
+  • Evernote notebooks exported as .enex files
+    (Evernote → right-click notebook → Export Notebook → ENEX format)
+
+First-time setup (3 steps):
+  Step 1 — Sign in to Microsoft:
+    evernote-to-onenote --auth
+  Step 2 — Preview what will be imported (nothing is written to OneNote):
+    evernote-to-onenote --batch ./Evernote-Export --dry-run
+  Step 3 — Run the import:
+    evernote-to-onenote --batch ./Evernote-Export
+```
+
+Running a dry-run preview on a folder of `.enex` files (output from `node src/index.js --batch tests/fixtures --dry-run`):
+
+```
+$ evernote-to-onenote --batch ./Evernote-Export --dry-run
+
+Evernote → OneNote Importer
+
+  ╔══════════════════════════════════════════════╗
+  ║  DRY RUN — nothing will be written to OneNote  ║
+  ╚══════════════════════════════════════════════╝
+  This is a safe preview. No Microsoft API calls will be made.
+  Remove --dry-run when you are ready to import for real.
+
+  Files:    15 notebook(s)
+  Mode:     DRY RUN (no API calls)
+  Tags:     page-metadata
+
+
+Importing file 1/15: minimal-note.enex → notebook "minimal-note"
+  1 note(s) found
+  [dry-run] Would create notebook: "minimal-note"
+  → [file 1/15: minimal-note.enex] [note 1/1] "Minimal"
+  [dry-run] Would create section: "Imported" in notebook dry-run-notebook-id
+  [dry-run] Would create page: "Minimal" in section dry-run-section-id
+  [████████████████████] 1/1 | 00:00 elapsed
+
+Importing file 2/15: mixed-notes.enex → notebook "mixed-notes"
+  3 note(s) found
+  [dry-run] Would create notebook: "mixed-notes"
+  → [file 2/15: mixed-notes.enex] [note 1/3] "Project Ideas"
+  → [file 2/15: mixed-notes.enex] [note 2/3] "Meeting Notes — 2026-01-15"
+  → [file 2/15: mixed-notes.enex] [note 3/3] "Recipe: Chocolate Cake"
+  [dry-run] Would create page: "Project Ideas" in section dry-run-section-id
+    Tags: ideas, work
+  [███████░░░░░░░░░░░░░] 1/3 | 00:00 elapsed | ~00:00 remaining
+    Tags: meetings
+  [█████████████░░░░░░░] 2/3 | 00:00 elapsed | ~00:00 remaining
+    Tags: personal, recipes
+  [████████████████████] 3/3 | 00:00 elapsed
+
+Importing file 3/15: unicode-titles.enex → notebook "unicode-titles"
+  4 note(s) found
+  [dry-run] Would create notebook: "unicode-titles"
+  → [file 3/15: unicode-titles.enex] [note 1/4] "日本語のノート"
+  → [file 3/15: unicode-titles.enex] [note 2/4] "📝 Meeting Notes 🚀"
+  → [file 3/15: unicode-titles.enex] [note 3/4] "ملاحظات اجتماع المشروع"
+  → [file 3/15: unicode-titles.enex] [note 4/4] "Ünïcödé Spécïàl Chàrś & Möre"
+  [████████████████████] 4/4 | 00:00 elapsed
+
+  ... (12 more notebooks processed) ...
+
+─────────────────────────────────────────────
+DRY RUN complete — nothing was written to OneNote.
+
+What would be imported:
+  • minimal-note                           1 note(s)
+  • mixed-notes                            3 note(s)
+  • multi-note                             3 note(s)
+  • multi-tag                              3 note(s)
+  • unicode-titles                         4 note(s)
+  • with-metadata                          2 note(s)
+  • with-resources                         1 note(s)
+  • (8 more notebooks, including 1 empty)
+
+  Total: 24 note(s) across 15 notebook(s)
+
+When you are ready to import for real, remove --dry-run:
+  evernote-to-onenote --batch <dir>
+
+Dry-run report saved to: ./dry-run-report.txt
+```
+
+---
+
 ## Examples
 
 ```sh
@@ -210,6 +312,8 @@ Not yet — Evernote's `.enex` export is always a full snapshot. Use `--date-ran
 ---
 
 ## Troubleshooting
+
+**On Windows?** See the dedicated [Windows troubleshooting guide](docs/WINDOWS-TROUBLESHOOTING.md) — it covers Node.js installation, PowerShell execution policy, PATH issues, and common `npm install` errors.
 
 **"Work or school accounts are not supported"**
 You must use a **personal** Microsoft account (Outlook.com / Hotmail / Live). Sign out of your work account in your browser and sign in with a personal account when prompted by `--auth`.

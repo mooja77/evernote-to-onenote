@@ -31,6 +31,7 @@ if (testFiles.length === 0) {
 const result = spawnSync(process.execPath, ['--test', ...nodeArgs, ...testFiles], {
   cwd: root,
   stdio: 'inherit',
+  env: { ...process.env, NODE_ENV: 'test' },
 });
 
 if (result.error) {
