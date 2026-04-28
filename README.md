@@ -37,6 +37,14 @@ evernote-to-onenote setup
 
 Nothing is written to OneNote during the setup preview. When the report looks right, the tool prints the exact import command to run next.
 
+If you want to check your computer before starting, run:
+
+```sh
+evernote-to-onenote doctor
+```
+
+It reports your Node.js version, Microsoft sign-in state, current command folder, and any existing `progress.json`.
+
 ---
 
 ## First-time setup: 3 steps
@@ -129,7 +137,9 @@ Usage:
   evernote-to-onenote --batch <dir> --dry-run    Preview (nothing written to OneNote)
   evernote-to-onenote --batch <dir>              Run the import
   evernote-to-onenote --verify                   Check import completed correctly
+  evernote-to-onenote doctor                     Check local setup and next steps
   evernote-to-onenote                            Guided step-by-step mode
+  evernote-to-onenote setup                      Beginner setup helper
 
 Options:
   --guided               Step-by-step prompts; starts with a safe preview
@@ -142,6 +152,7 @@ Options:
   --resume               Skip notes already imported (checks OneNote to confirm)
   --force-reimport       Re-import all notes even if already in progress.json
   --verify               Compare progress.json against live OneNote page counts
+  --doctor               Check local setup and next steps, then exit
   --year-sections        Organise notes by year (sections: 2018, 2019, …)
   --output-html <dir>    Save notes as HTML files locally (no account needed)
   --tags-strategy <s>    Tags as: page-metadata (default) or section-groups

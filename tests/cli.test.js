@@ -39,6 +39,7 @@ describe('CLI — argument handling', () => {
     assert.equal(status, 0);
     assert.match(stdout, /Usage/i);
     assert.match(stdout, /evernote-to-onenote setup/);
+    assert.match(stdout, /evernote-to-onenote doctor/);
   });
 
   test('prints package version and exits 0 with --version', () => {
@@ -47,6 +48,22 @@ describe('CLI — argument handling', () => {
     assert.equal(status, 0);
     assert.equal(stderr, '');
     assert.equal(stdout.trim(), version);
+  });
+
+  test('doctor prints local setup checks and exits 0', () => {
+    const cwdDir = makeTempDir('doctor');
+    try {
+      const { status, stdout, stderr } = run(['doctor'], { cwd: cwdDir });
+      assert.equal(status, 0);
+      assert.equal(stderr, '');
+      assert.match(stdout, /Evernote -> OneNote Doctor/);
+      assert.match(stdout, /Node\.js:/);
+      assert.match(stdout, /Microsoft sign-in:/);
+      assert.match(stdout, /Progress file:/);
+      assert.match(stdout, /evernote-to-onenote setup/);
+    } finally {
+      fs.rmSync(cwdDir, { recursive: true, force: true });
+    }
   });
 
   test('exits 1 with an error when file does not end in .enex', () => {

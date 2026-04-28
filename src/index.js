@@ -46,6 +46,59 @@ function hasSavedMicrosoftSession() {
   );
 }
 
+function getProgressSummary(progressPath = path.join(process.cwd(), 'progress.json')) {
+  if (!fs.existsSync(progressPath)) {
+    return { exists: false, readable: false, fileCount: 0, importedCount: 0, path: progressPath };
+  }
+
+  try {
+    const progress = JSON.parse(fs.readFileSync(progressPath, 'utf8'));
+    const files = progress.files || {};
+    const importedCount = Object.values(files).reduce((sum, file) => {
+      return sum + Object.keys((file && file.imported) || {}).length;
+    }, 0);
+    return {
+      exists: true,
+      readable: true,
+      fileCount: Object.keys(files).length,
+      importedCount,
+      path: progressPath,
+    };
+  } catch {
+    return { exists: true, readable: false, fileCount: 0, importedCount: 0, path: progressPath };
+  }
+}
+
+function printDoctor({
+  stdout = console.log,
+  nodeVersion = process.version,
+  hasSession = hasSavedMicrosoftSession(),
+  progress = getProgressSummary(),
+  cwd = process.cwd(),
+} = {}) {
+  stdout('Evernote -> OneNote Doctor');
+  stdout('');
+  stdout(`Node.js: ${nodeVersion}`);
+  stdout(hasSession
+    ? 'Microsoft sign-in: saved session found'
+    : 'Microsoft sign-in: not found yet');
+  stdout(`Current folder: ${cwd}`);
+  if (!progress.exists) {
+    stdout('Progress file: none in the current folder');
+  } else if (!progress.readable) {
+    stdout('Progress file: found, but it could not be read');
+  } else {
+    stdout(`Progress file: ${progress.importedCount} imported note(s) across ${progress.fileCount} file(s)`);
+  }
+  stdout('');
+  stdout('Safe next steps:');
+  if (!hasSession) {
+    stdout('  1. Sign in once: evernote-to-onenote --auth');
+  }
+  stdout('  2. Preview first: evernote-to-onenote setup');
+  stdout('  3. Import only after checking the dry-run report.');
+}
+
 function sanitizeName(name) {
   return name
     .replace(/[\x00-\x1f]/g, '')    // strip null bytes and control chars (invalid in filenames)
@@ -451,6 +504,11 @@ async function main() {
     process.exit(0);
   }
 
+  if (args[0] === 'doctor' || args.includes('--doctor')) {
+    printDoctor();
+    process.exit(0);
+  }
+
   if (args.includes('--help')) {
     console.log([
       'Evernote → OneNote Importer',
@@ -487,6 +545,7 @@ async function main() {
       '  evernote-to-onenote --batch <dir> --dry-run    Preview (no data sent to OneNote)',
       '  evernote-to-onenote --batch <dir>              Run the import',
       '  evernote-to-onenote --verify                   Check import completed correctly',
+      '  evernote-to-onenote doctor                     Check local setup and next steps',
       '  evernote-to-onenote                            Guided step-by-step mode',
       '  evernote-to-onenote setup                      Beginner setup helper',
       '',
@@ -501,6 +560,7 @@ async function main() {
       '  --resume               Skip notes already imported (checks OneNote to confirm)',
       '  --force-reimport       Re-import all notes even if already in progress.json',
       '  --verify               Compare progress.json against live OneNote page counts',
+      '  --doctor               Check local setup and next steps, then exit',
       '  --year-sections        Organise notes by year (sections: 2018, 2019, …)',
       '  --output-html <dir>    Save notes as HTML files locally (no Microsoft account needed)',
       '  --tags-strategy <s>    Tags as: page-metadata (default, #hashtag footer) or section-groups',
@@ -901,6 +961,8 @@ module.exports = {
   runVerify,
   checkNodeVersion,
   hasSavedMicrosoftSession,
+  getProgressSummary,
+  printDoctor,
   matchNotebookPattern,
   parseDateRange,
   enexDateToIso,

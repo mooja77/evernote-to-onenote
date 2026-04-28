@@ -185,13 +185,14 @@ async function interactiveSetup({
         // only a plain-English hint for non-technical users.
       }
       console.log('─────────────────────────────────────────────');
-      console.log('Existing progress found');
+      console.log('Existing progress found in this command folder');
       console.log('─────────────────────────────────────────────');
       if (fileCount > 0 || importedCount > 0) {
         console.log(`  progress.json tracks ${importedCount} imported note(s) across ${fileCount} file(s).`);
       } else {
-        console.log('  progress.json is present in this folder.');
+        console.log('  progress.json is present in this command folder.');
       }
+      console.log('  This only affects imports run from the current command folder.');
       console.log('  If an import was interrupted, continue later with:');
       console.log('    evernote-to-onenote --batch <folder> --resume');
       console.log('');
