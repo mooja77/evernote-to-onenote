@@ -356,6 +356,7 @@ describe('CLI — --guided flag', () => {
     const { status, stdout } = run(['--help']);
     assert.equal(status, 0);
     assert.match(stdout, /--guided/);
+    assert.match(stdout, /--no-interactive/);
   });
 
   test('--guided --help prints help instead of entering prompts', () => {
@@ -387,6 +388,74 @@ describe('CLI — --guided flag', () => {
       fs.rmSync(batchDir, { recursive: true, force: true });
       fs.rmSync(cwdDir, { recursive: true, force: true });
     }
+  });
+
+  test('--guided defaults to a safe dry-run preview even without --dry-run', () => {
+    const batchDir = makeTempDir('guided-default-preview');
+    const cwdDir = makeTempDir('guided-default-preview-cwd');
+    try {
+      fs.copyFileSync(fix('single-note.enex'), path.join(batchDir, 'single-note.enex'));
+      const { status, stdout, stderr } = spawnSync(
+        process.execPath,
+        [CLI, '--guided', '--no-report'],
+        {
+          encoding: 'utf8',
+          input: batchDir + '\ny\n',
+          env: { ...process.env, ONENOTE_ACCESS_TOKEN: '', MSAL_NO_INTERACTIVE: '1' },
+          timeout: 15000,
+          cwd: cwdDir,
+        }
+      );
+      assert.equal(status, 0, `stdout: ${stdout}\nstderr: ${stderr}`);
+      assert.match(stdout, /safe preview/i);
+      assert.match(stdout, /DRY RUN complete/i);
+      assert.doesNotMatch(stderr, /signed in|auth/i);
+    } finally {
+      fs.rmSync(batchDir, { recursive: true, force: true });
+      fs.rmSync(cwdDir, { recursive: true, force: true });
+    }
+  });
+
+  test('--guided explains existing progress before prompting', () => {
+    const batchDir = makeTempDir('guided-progress');
+    const cwdDir = makeTempDir('guided-progress-cwd');
+    try {
+      fs.copyFileSync(fix('single-note.enex'), path.join(batchDir, 'single-note.enex'));
+      fs.writeFileSync(path.join(cwdDir, 'progress.json'), JSON.stringify({
+        version: 2,
+        files: {
+          'single-note.enex': {
+            imported: {
+              'single-note.enex::Single Note::20260101000000Z': { onenote_page_id: 'page-1' },
+            },
+          },
+        },
+      }, null, 2));
+      const { status, stdout } = spawnSync(
+        process.execPath,
+        [CLI, '--guided', '--dry-run', '--no-report'],
+        {
+          encoding: 'utf8',
+          input: batchDir + '\ny\n',
+          env: { ...process.env, ONENOTE_ACCESS_TOKEN: '', MSAL_NO_INTERACTIVE: '1' },
+          timeout: 15000,
+          cwd: cwdDir,
+        }
+      );
+      assert.equal(status, 0, `stdout: ${stdout}`);
+      assert.match(stdout, /Existing progress found/i);
+      assert.match(stdout, /--resume/);
+    } finally {
+      fs.rmSync(batchDir, { recursive: true, force: true });
+      fs.rmSync(cwdDir, { recursive: true, force: true });
+    }
+  });
+
+  test('--no-interactive with no input prints usage and exits 0', () => {
+    const { status, stdout } = run(['--no-interactive']);
+    assert.equal(status, 0);
+    assert.match(stdout, /guided prompts were skipped/i);
+    assert.match(stdout, /--batch <dir> --dry-run/);
   });
 
   test('--guided re-prompts on empty path before accepting valid input', () => {

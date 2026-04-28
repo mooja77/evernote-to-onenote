@@ -160,6 +160,35 @@ async function interactiveSetup({ dryRun = false, exit = process.exit } = {}) {
     console.log('    Work/school accounts (Microsoft 365) are NOT supported.');
     console.log('  • Your Evernote notebooks exported as .enex files (see below)');
     console.log('');
+
+    const progressPath = path.join(process.cwd(), 'progress.json');
+    if (fs.existsSync(progressPath)) {
+      let importedCount = 0;
+      let fileCount = 0;
+      try {
+        const progress = JSON.parse(fs.readFileSync(progressPath, 'utf8'));
+        const files = progress.files || {};
+        fileCount = Object.keys(files).length;
+        importedCount = Object.values(files).reduce((sum, file) => {
+          return sum + Object.keys((file && file.imported) || {}).length;
+        }, 0);
+      } catch {
+        // The importer handles corrupt progress files later; this banner is
+        // only a plain-English hint for non-technical users.
+      }
+      console.log('─────────────────────────────────────────────');
+      console.log('Existing progress found');
+      console.log('─────────────────────────────────────────────');
+      if (fileCount > 0 || importedCount > 0) {
+        console.log(`  progress.json tracks ${importedCount} imported note(s) across ${fileCount} file(s).`);
+      } else {
+        console.log('  progress.json is present in this folder.');
+      }
+      console.log('  If an import was interrupted, continue later with:');
+      console.log('    evernote-to-onenote --batch <folder> --resume');
+      console.log('');
+    }
+
     console.log('─────────────────────────────────────────────');
     console.log('Step 1 of 3: Export your notebooks from Evernote');
     console.log('─────────────────────────────────────────────');

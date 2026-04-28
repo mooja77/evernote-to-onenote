@@ -455,7 +455,8 @@ async function main() {
       '  evernote-to-onenote                            Guided step-by-step mode',
       '',
       'All options:',
-      '  --guided               Step-by-step prompts (same as running with no arguments)',
+      '  --guided               Step-by-step prompts; starts with a safe preview',
+      '  --no-interactive       Never open prompts; print next-step usage instead',
       '  --auth                 Sign in to Microsoft and save your session, then exit',
       '  --batch <dir>          Import all .enex files in a folder',
       '  --dry-run              Preview what would be imported — nothing is written to OneNote',
@@ -480,17 +481,24 @@ async function main() {
   }
 
   const quiet = args.includes('--quiet');
-  const dryRun = args.includes('--dry-run');
-  const resume = args.includes('--resume');
+  let dryRun = args.includes('--dry-run');
+  let resume = args.includes('--resume');
   const forceReimport = args.includes('--force-reimport');
   const yearSections = args.includes('--year-sections');
   const verify = args.includes('--verify');
+  const noInteractive = args.includes('--no-interactive');
+  const guidedRequested = args.includes('--guided');
 
   // Guided mode: --guided flag OR no args on a TTY -> interactive prompts.
   let interactiveFiles = null;
-  if ((args.length === 0 && process.stdin.isTTY) || args.includes('--guided')) {
+  if (!noInteractive && ((args.length === 0 && process.stdin.isTTY) || guidedRequested)) {
+    if (!dryRun) {
+      dryRun = true;
+      console.log('Guided mode starts with a safe preview. Nothing will be written to OneNote.');
+      console.log('After checking the report, run the printed import command when you are ready.');
+    }
     interactiveFiles = await interactiveSetup({ dryRun });
-  } else if (args.length === 0) {
+  } else if (args.length === 0 || (noInteractive && args.length === 1)) {
     console.log('Evernote → OneNote Importer');
     console.log('');
     console.log('First-time? Start here:');
@@ -498,6 +506,10 @@ async function main() {
     console.log('  evernote-to-onenote --batch <dir> --dry-run         Preview (no changes)');
     console.log('  evernote-to-onenote --batch <dir>                   Run the import');
     console.log('');
+    if (noInteractive) {
+      console.log('--no-interactive was set, so guided prompts were skipped.');
+      console.log('');
+    }
     console.log('Run evernote-to-onenote --help for all options and requirements.');
     process.exit(0);
   }

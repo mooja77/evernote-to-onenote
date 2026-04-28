@@ -81,7 +81,7 @@ Compares the number of notes imported against the number of pages in OneNote. Ex
 
 ## Not technical? Use guided mode
 
-Run with no arguments for a step-by-step experience that asks for your folder path, shows you what it found, and confirms before starting:
+Run with no arguments for a step-by-step experience that asks for your folder path, shows you what it found, and starts with a safe preview:
 
 ```sh
 evernote-to-onenote
@@ -120,7 +120,8 @@ Usage:
   evernote-to-onenote                            Guided step-by-step mode
 
 Options:
-  --guided               Step-by-step prompts (same as no arguments)
+  --guided               Step-by-step prompts; starts with a safe preview
+  --no-interactive       Never open prompts; print next-step usage instead
   --auth                 Sign in to Microsoft and save session, then exit
   --batch <dir>          Import all .enex files in a folder
   --dry-run              Preview — nothing is written to OneNote
