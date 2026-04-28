@@ -27,6 +27,30 @@ function run(args, opts = {}) {
   });
 }
 
+describe('CLI — --batch error messages', () => {
+  test('--batch with nonexistent directory exits 1 with path and Windows drag tip', () => {
+    const { status, stderr } = run(['--batch', '/nonexistent-enex-dir-wave6', '--dry-run']);
+    assert.equal(status, 1);
+    assert.match(stderr, /--batch directory not found/i);
+    assert.match(stderr, /Check the folder path/i);
+    assert.match(stderr, /drag/i);
+  });
+
+  test('--batch with directory containing no .enex files exits 1 with export instructions', () => {
+    const emptyDir = makeTempDir('no-enex');
+    try {
+      const { status, stderr } = run(['--batch', emptyDir, '--dry-run']);
+      assert.equal(status, 1);
+      assert.match(stderr, /No \.enex files found/i);
+      assert.match(stderr, /Export Notebook/i);
+      assert.match(stderr, /ENEX format/i);
+      assert.match(stderr, /--batch.*--dry-run/);
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('CLI — argument handling', () => {
   test('prints usage and exits 0 with no arguments', () => {
     const { status, stdout } = run([]);

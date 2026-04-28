@@ -672,6 +672,9 @@ async function main() {
     const resolvedDir = path.resolve(batchDir);
     if (!fs.existsSync(resolvedDir) || !fs.statSync(resolvedDir).isDirectory()) {
       console.error(`Error: --batch directory not found: ${resolvedDir}`);
+      console.error('');
+      console.error('Check the folder path and try again.');
+      console.error('Tip: On Windows, drag the folder into this terminal window to paste its path.');
       process.exit(1);
     }
     enexFiles = fs.readdirSync(resolvedDir)
@@ -686,6 +689,14 @@ async function main() {
     }
     if (enexFiles.length === 0) {
       console.error(`No .enex files found in: ${resolvedDir}`);
+      console.error('');
+      console.error('Your Evernote export files should end in .enex');
+      console.error('To export from Evernote:');
+      console.error('  1. Open Evernote on your computer');
+      console.error('  2. Right-click a notebook → Export Notebook');
+      console.error('  3. Choose ENEX format (not HTML or PDF)');
+      console.error('  4. Save the .enex file(s) into a folder');
+      console.error('  5. Re-run: evernote-to-onenote --batch <that folder> --dry-run');
       process.exit(1);
     }
   } else {
