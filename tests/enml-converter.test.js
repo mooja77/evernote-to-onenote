@@ -47,10 +47,11 @@ describe('enmlToHtml', () => {
     assert.doesNotMatch(html, /<en-media/);
   });
 
-  test('replaces en-crypt with [encrypted content] placeholder', () => {
+  // v1.3.0: en-crypt placeholder reworded for better UX (was '[encrypted content]').
+  test('replaces en-crypt with friendly v1.3.0 placeholder', () => {
     const enml = '<en-note><en-crypt cipher="RC2">ENCRYPTEDDATA</en-crypt></en-note>';
     const html = enmlToHtml(enml);
-    assert.match(html, /\[encrypted content\]/);
+    assert.match(html, /\[Encrypted content/);
     assert.doesNotMatch(html, /<en-crypt/);
   });
 
@@ -283,7 +284,7 @@ describe('enmlToHtmlWithResources', () => {
   test('en-crypt is still replaced in resource mode', () => {
     const enml = '<en-note><en-crypt>ENCDATA</en-crypt></en-note>';
     const { html } = enmlToHtmlWithResources(enml, []);
-    assert.match(html, /\[encrypted content\]/);
+    assert.match(html, /\[Encrypted content/);
     assert.doesNotMatch(html, /<en-crypt/);
   });
 
@@ -301,5 +302,176 @@ describe('enmlToHtmlWithResources', () => {
     const enml = '<en-note><en-media type="image/png" hash="cafebabe"/></en-note>';
     const { usedResources } = enmlToHtmlWithResources(enml, [r]);
     assert.equal(usedResources[0].data, imgBuf);
+  });
+});
+
+// --- v1.3.0 hardening tests ----------------------------------------------
+
+const {
+  convertCodeBlocks,
+  flattenNestedTables,
+  convertFootnotes,
+  convertUnknownEnElements,
+} = require('../src/enml-converter');
+
+describe('v1.3.0 - convertCodeBlocks', () => {
+  test('en-codeblock with language attribute -> pre code class', () => {
+    const out = convertCodeBlocks('<en-codeblock language="python">print(1)</en-codeblock>');
+    assert.match(out, /<pre><code class="language-python">/);
+    assert.match(out, /print\(1\)/);
+    assert.match(out, /<\/code><\/pre>/);
+  });
+
+  test('accepts both language= and lang= attribute names', () => {
+    assert.match(convertCodeBlocks('<en-codeblock lang="js">x</en-codeblock>'), /class="language-js"/);
+    assert.match(convertCodeBlocks('<en-codeblock language="ts">x</en-codeblock>'), /class="language-ts"/);
+  });
+
+  test('en-codeblock without language uses bare pre/code', () => {
+    assert.match(convertCodeBlocks('<en-codeblock>plain</en-codeblock>'), /<pre><code>plain<\/code><\/pre>/);
+  });
+
+  test('preserves multiline code content verbatim', () => {
+    const code = 'function f() {\n  return 1;\n}';
+    const out = convertCodeBlocks('<en-codeblock language="js">' + code + '</en-codeblock>');
+    assert.ok(out.includes(code));
+  });
+
+  test('non-en-codeblock content is passed through unchanged', () => {
+    assert.equal(convertCodeBlocks('<p>hello</p>'), '<p>hello</p>');
+  });
+});
+
+describe('v1.3.0 - flattenNestedTables', () => {
+  test('table inside td is flattened to pipe-separated text', () => {
+    const enml = '<table><tr><td><table><tr><td>a</td><td>b</td></tr></table></td></tr></table>';
+    const out = flattenNestedTables(enml);
+    assert.match(out, /<table>/);
+    assert.match(out, /a \| b/);
+    assert.equal((out.match(/<table/g) || []).length, 1);
+  });
+
+  test('top-level (non-nested) table is preserved intact', () => {
+    const enml = '<table><tr><td>x</td><td>y</td></tr></table>';
+    assert.equal(flattenNestedTables(enml), enml);
+  });
+
+  test('three-deep nesting flattens innermost to outermost', () => {
+    const enml = '<table><tr><td><table><tr><td><table><tr><td>deep</td></tr></table></td></tr></table></td></tr></table>';
+    const out = flattenNestedTables(enml);
+    assert.match(out, /deep/);
+    assert.equal((out.match(/<table/g) || []).length, 1, 'only outer table should remain');
+  });
+
+  test('rows joined by br', () => {
+    const enml = '<table><tr><td><table><tr><td>r1</td></tr><tr><td>r2</td></tr></table></td></tr></table>';
+    const out = flattenNestedTables(enml);
+    assert.match(out, /r1<br\/>r2/);
+  });
+});
+
+describe('v1.3.0 - convertFootnotes', () => {
+  test('inline footnote ref becomes <sup>[N]</sup>', () => {
+    const enml = 'See <sup><a href="#fn-1">1</a></sup> for details.';
+    const out = convertFootnotes(enml);
+    assert.match(out, /<sup>\[1\]<\/sup>/);
+    assert.doesNotMatch(out, /href="#fn/);
+  });
+
+  test('back-link anchors are stripped', () => {
+    const enml = '<p>Footnote text. <a href="#fnref-1">back</a></p>';
+    const out = convertFootnotes(enml);
+    assert.doesNotMatch(out, /<a /);
+    assert.doesNotMatch(out, /href="#fnref/);
+  });
+
+  test('section.footnotes becomes div.endnotes with Notes heading', () => {
+    const enml = '<section class="footnotes"><ol><li>Note one</li></ol></section>';
+    const out = convertFootnotes(enml);
+    assert.match(out, /<div class="endnotes">/);
+    assert.match(out, /<h4>Notes<\/h4>/);
+    assert.match(out, /Note one/);
+    assert.doesNotMatch(out, /<section/);
+  });
+});
+
+describe('v1.3.0 - convertUnknownEnElements (safety net)', () => {
+  test('unknown en-foo emits visible marker', () => {
+    const out = convertUnknownEnElements('<en-foo>hidden</en-foo>');
+    assert.equal(out, '[unsupported: en-foo]');
+  });
+
+  test('self-closing en-bar emits marker', () => {
+    const out = convertUnknownEnElements('<en-bar id="x" />');
+    assert.equal(out, '[unsupported: en-bar]');
+  });
+
+  test('multiple distinct unknown elements each get their own marker', () => {
+    const out = convertUnknownEnElements('<en-a>1</en-a><en-b>2</en-b>');
+    assert.match(out, /\[unsupported: en-a\]/);
+    assert.match(out, /\[unsupported: en-b\]/);
+  });
+
+  test('non en- elements are untouched', () => {
+    assert.equal(convertUnknownEnElements('<div>kept</div>'), '<div>kept</div>');
+  });
+});
+
+describe('v1.3.0 - enmlToHtml end-to-end with new hardening', () => {
+  test('en-codeblock survives full pipeline (does NOT get marked unsupported)', () => {
+    const html = enmlToHtml('<en-note><en-codeblock language="js">code</en-codeblock></en-note>');
+    assert.match(html, /<pre><code class="language-js">code<\/code><\/pre>/);
+    assert.doesNotMatch(html, /unsupported.*en-codeblock/);
+  });
+
+  test('unknown en-fancy gets the unsupported marker (not silently dropped)', () => {
+    const html = enmlToHtml('<en-note><en-fancy>magic</en-fancy></en-note>');
+    assert.match(html, /\[unsupported: en-fancy\]/);
+  });
+
+  test('nested table inside note body gets flattened', () => {
+    const enml = '<en-note><table><tr><td><table><tr><td>x</td><td>y</td></tr></table></td></tr></table></en-note>';
+    const html = enmlToHtml(enml);
+    assert.match(html, /x \| y/);
+    assert.equal((html.match(/<table/g) || []).length, 1);
+  });
+
+  test('en-codeblock and en-todo and unknown en- coexist correctly', () => {
+    const enml = '<en-note><en-todo/>do<en-codeblock>x</en-codeblock><en-mystery/></en-note>';
+    const html = enmlToHtml(enml);
+    assert.match(html, /☐/); // unchecked todo box
+    assert.match(html, /<pre><code>x<\/code><\/pre>/);
+    assert.match(html, /\[unsupported: en-mystery\]/);
+  });
+});
+
+describe('v1.3.0 - enmlToHtmlWithResources preserves en-media positioning', () => {
+  test('image preserves style attribute', () => {
+    const r = { hash: 'abc123', mime: 'image/png', filename: 'p.png', data: Buffer.from('x') };
+    const enml = '<en-note><en-media type="image/png" hash="abc123" style="float:left;margin:5px"/></en-note>';
+    const { html } = enmlToHtmlWithResources(enml, [r]);
+    assert.match(html, /style="float:left;margin:5px"/);
+  });
+
+  test('image preserves width and height', () => {
+    const r = { hash: 'def456', mime: 'image/png', filename: 'p.png', data: Buffer.from('x') };
+    const enml = '<en-note><en-media type="image/png" hash="def456" width="200" height="150"/></en-note>';
+    const { html } = enmlToHtmlWithResources(enml, [r]);
+    assert.match(html, /width="200"/);
+    assert.match(html, /height="150"/);
+  });
+
+  test('non-image object preserves positioning attributes', () => {
+    const r = { hash: 'aabb', mime: 'application/pdf', filename: 'doc.pdf', data: Buffer.from('x') };
+    const enml = '<en-note><en-media type="application/pdf" hash="aabb" style="display:block"/></en-note>';
+    const { html } = enmlToHtmlWithResources(enml, [r]);
+    assert.match(html, /<object[^>]*style="display:block"/);
+  });
+
+  test('en-media with no positioning attrs stays minimal (no extra spaces)', () => {
+    const r = { hash: 'eeff', mime: 'image/png', filename: 'p.png', data: Buffer.from('x') };
+    const enml = '<en-note><en-media type="image/png" hash="eeff"/></en-note>';
+    const { html } = enmlToHtmlWithResources(enml, [r]);
+    assert.match(html, /<img src="name:part1" \/>/);
   });
 });
