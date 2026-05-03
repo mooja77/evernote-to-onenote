@@ -1,8 +1,22 @@
 'use strict';
 /**
- * ENML Converter — converts Evernote Markup Language (ENML) to plain HTML
- * ENML is a restricted XHTML variant. We strip the en-note wrapper and
- * remove Evernote-specific tags, producing clean HTML for OneNote.
+ * ENML Converter — converts Evernote Markup Language (ENML) to plain HTML.
+ *
+ * v1.3.0 hardening additions (additive — pre-1.3.0 inputs that don't trigger
+ * the new handlers behave unchanged):
+ *   - convertCodeBlocks       — <en-codeblock> → <pre><code class="language-X">
+ *   - flattenNestedTables     — tables nested in <td>/<th> flattened to
+ *                               pipe-separated text rows (OneNote can't
+ *                               render nested tables)
+ *   - convertFootnotes        — <sup><a href="#fn-N">N</a></sup> → <sup>[N]</sup>;
+ *                               back-links stripped; <section.footnotes> →
+ *                               <div.endnotes>
+ *   - convertMedia preserves style/width/height (v1.2.4 dropped them)
+ *   - <en-crypt> message reworded for actionability
+ *   - convertUnknownEnElements — final safety net so any unhandled <en-*>
+ *                               element emits a visible [unsupported: en-X]
+ *                               marker instead of being silently passed to
+ *                               OneNote
  */
 
 function enmlToHtml(enml) {
@@ -10,44 +24,43 @@ function enmlToHtml(enml) {
 
   let html = enml;
 
-  // Remove XML declaration and DOCTYPE
   html = html.replace(/<\?xml[^>]*\?>/gi, '');
   html = html.replace(/<!DOCTYPE[^>]*>/gi, '');
 
-  // Unwrap <en-note> → <div>
   html = html.replace(/<en-note[^>]*>/gi, '<div class="note-body">');
   html = html.replace(/<\/en-note>/gi, '</div>');
 
-  // Convert <en-todo checked="true"/> → ✅  and <en-todo/> → ☐
+  // Convert <en-codeblock> BEFORE the en-* fallback strips it.
+  html = convertCodeBlocks(html);
+
   html = html.replace(/<en-todo[^>]*checked="true"[^>]*\/>/gi, '<span>✅ </span>');
   html = html.replace(/<en-todo[^/]*(\/?)>/gi, '<span>☐ </span>');
 
-  // Remove <en-media> (attachments — would need binary upload to OneNote)
   html = html.replace(/<en-media[^>]*\/>/gi, '[attachment]');
 
-  // Remove en-crypt elements
-  html = html.replace(/<en-crypt[^>]*>.*?<\/en-crypt>/gis, '[encrypted content]');
+  // v1.3.0: en-crypt message reworded for actionability.
+  html = html.replace(
+    /<en-crypt[^>]*>[\s\S]*?<\/en-crypt>/gi,
+    '<p>[Encrypted content — decrypt in Evernote before export]</p>',
+  );
 
-  // Trim whitespace
+  html = flattenNestedTables(html);
+  html = convertFootnotes(html);
+  html = convertUnknownEnElements(html);
+
   html = html.trim();
-
   return html || '<p></p>';
 }
 
 /**
  * Convert ENML to HTML and resolve <en-media> elements against resource list.
  *
- * Images become: <img src="name:partN" />
- * Other types become: <object data="name:partN" data-attachment="filename" type="contentType" />
- *
- * @param {string} enml
- * @param {Array<{ hash: string, mime: string, filename: string, data: Buffer }>} resources
- * @returns {{ html: string, usedResources: Array<{ contentType: string, data: Buffer, partName: string }> }}
+ * v1.3.0 — preserves style/width/height attributes from the original
+ * <en-media> so inline positioning survives the conversion.
  */
 function enmlToHtmlWithResources(enml, resources = []) {
   if (!enml) return { html: '<p></p>', usedResources: [] };
 
-  // Build a hash → resource lookup
   const byHash = new Map();
   for (const r of resources) {
     if (r.hash) byHash.set(r.hash.toLowerCase(), r);
@@ -58,19 +71,17 @@ function enmlToHtmlWithResources(enml, resources = []) {
 
   let html = enml;
 
-  // Remove XML declaration and DOCTYPE
   html = html.replace(/<\?xml[^>]*\?>/gi, '');
   html = html.replace(/<!DOCTYPE[^>]*>/gi, '');
 
-  // Unwrap <en-note> → <div>
   html = html.replace(/<en-note[^>]*>/gi, '<div class="note-body">');
   html = html.replace(/<\/en-note>/gi, '</div>');
 
-  // Convert <en-todo>
+  html = convertCodeBlocks(html);
+
   html = html.replace(/<en-todo[^>]*checked="true"[^>]*\/>/gi, '<span>✅ </span>');
   html = html.replace(/<en-todo[^/]*(\/?)>/gi, '<span>☐ </span>');
 
-  // Replace <en-media> with inline references
   html = html.replace(/<en-media\b([^>]*)\/>/gi, (match, attrs) => {
     const hashMatch = attrs.match(/hash="([a-f0-9]+)"/i);
     const mimeMatch = attrs.match(/type="([^"]+)"/i);
@@ -91,28 +102,29 @@ function enmlToHtmlWithResources(enml, resources = []) {
       partName,
     });
 
+    const positioning = extractPositioningAttrs(attrs);
+
     if (effectiveMime.startsWith('image/')) {
-      return `<img src="name:${partName}" />`;
+      return `<img src="name:${partName}"${positioning} />`;
     }
 
     const filename = escapeHtml(resource.filename || partName);
-    return `<object data="name:${partName}" data-attachment="${filename}" type="${escapeHtml(effectiveMime)}"></object>`;
+    return `<object data="name:${partName}" data-attachment="${filename}" type="${escapeHtml(effectiveMime)}"${positioning}></object>`;
   });
 
-  // Remove en-crypt elements
-  html = html.replace(/<en-crypt[^>]*>.*?<\/en-crypt>/gis, '[encrypted content]');
+  html = html.replace(
+    /<en-crypt[^>]*>[\s\S]*?<\/en-crypt>/gi,
+    '<p>[Encrypted content — decrypt in Evernote before export]</p>',
+  );
+
+  html = flattenNestedTables(html);
+  html = convertFootnotes(html);
+  html = convertUnknownEnElements(html);
 
   html = html.trim();
-
   return { html: html || '<p></p>', usedResources };
 }
 
-/**
- * Wrap converted HTML in a OneNote-compatible HTML page structure.
- * @param {string} title
- * @param {string} htmlBody
- * @param {{ created?: string|null, author?: string|null, sourceUrl?: string|null }|null} [metadata]
- */
 function toOneNoteHtml(title, htmlBody, metadata = null) {
   let metaBlock = '';
   if (metadata) {
@@ -162,4 +174,154 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-module.exports = { enmlToHtml, toOneNoteHtml, enmlToHtmlWithResources, formatEnexDate };
+// ─── v1.3.0 hardening helpers ──────────────────────────────────────────────
+
+/**
+ * Convert <en-codeblock language="python">...</en-codeblock> to
+ * <pre><code class="language-python">...</code></pre>.
+ *
+ * Both `language=` and `lang=` accepted. Code content preserved verbatim
+ * (ENML pre-encodes entities; re-escaping would double-encode).
+ */
+function convertCodeBlocks(html) {
+  return html.replace(
+    /<en-codeblock([^>]*)>([\s\S]*?)<\/en-codeblock>/gi,
+    (_match, attrs, code) => {
+      const lang = extractAttr(attrs, 'language') || extractAttr(attrs, 'lang');
+      const classAttr = lang ? ` class="language-${escapeHtmlAttr(lang)}"` : '';
+      return `<pre><code${classAttr}>${code}</code></pre>`;
+    },
+  );
+}
+
+/**
+ * Flatten tables nested inside <td>/<th> cells into pipe-separated text
+ * rows joined by <br/>. OneNote does not support nested tables; v1.2.4
+ * left them intact and OneNote rendered them as visually broken.
+ */
+function flattenNestedTables(html) {
+  const MAX_PASSES = 8;
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    const before = html;
+    html = html.replace(
+      /<table(?:\s[^>]*)?>(?:(?!<table)[\s\S])*?<\/table>/gi,
+      (match, offset, full) => {
+        const prefix = full.slice(0, offset);
+        return isInsideTableCell(prefix) ? innerTableToText(match) : match;
+      },
+    );
+    if (html === before) break;
+  }
+  return html;
+}
+
+function isInsideTableCell(prefix) {
+  const lastOpen = Math.max(prefix.lastIndexOf('<td'), prefix.lastIndexOf('<th'));
+  if (lastOpen === -1) return false;
+  return !/<\/t[dh]>/i.test(prefix.slice(lastOpen));
+}
+
+function innerTableToText(tableHtml) {
+  const rows = [];
+  const rowRe = /<tr(?:\s[^>]*)?>[\s\S]*?<\/tr>/gi;
+  let rowMatch;
+  while ((rowMatch = rowRe.exec(tableHtml)) !== null) {
+    const cells = [];
+    const cellRe = /<t[dh](?:\s[^>]*)?>[\s\S]*?<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRe.exec(rowMatch[0])) !== null) {
+      const text = stripTags(cellMatch[0]).trim();
+      if (text) cells.push(text);
+    }
+    if (cells.length > 0) rows.push(cells.join(' | '));
+  }
+  return rows.join('<br/>');
+}
+
+/**
+ * Convert footnote-style references to an endnote pattern.
+ *
+ *  1. Inline refs:   <sup><a href="#fn-N">N</a></sup>  →  <sup>[N]</sup>
+ *  2. Back-links:    <a href="#fnref-N">↩</a>          →  (removed)
+ *  3. <section class="footnotes">...</section> →
+ *     <div class="endnotes"><h4>Notes</h4>...</div>
+ *
+ * Hash-anchor hrefs are stripped — OneNote pages do not support in-page
+ * anchor navigation, so they would silently do nothing.
+ */
+function convertFootnotes(html) {
+  html = html.replace(
+    /<sup[^>]*>\s*<a\s[^>]*href=["']#fn[^"']*["'][^>]*>([\s\S]*?)<\/a>\s*<\/sup>/gi,
+    (_m, label) => `<sup>[${stripTags(label).trim()}]</sup>`,
+  );
+  html = html.replace(
+    /<a\s[^>]*href=["']#fnref[^"']*["'][^>]*>[\s\S]*?<\/a>/gi,
+    '',
+  );
+  html = html.replace(
+    /<section[^>]*class=["'][^"']*footnotes[^"']*["'][^>]*>([\s\S]*?)<\/section>/gi,
+    (_m, body) => `<div class="endnotes"><h4>Notes</h4>${body}</div>`,
+  );
+  return html;
+}
+
+/**
+ * Replace any remaining <en-*> elements with a visible unsupported marker.
+ * Runs AFTER all named conversions so only genuinely unknown elements
+ * reach this step. Never silently drops content — the marker is always
+ * emitted. Iterative to handle nested unknown elements (innermost first).
+ */
+function convertUnknownEnElements(html) {
+  html = html.replace(/<(en-[a-z][a-z0-9-]*)(?:\s[^>]*)?\s*\/>/gi, '[unsupported: $1]');
+  const MAX_PASSES = 5;
+  for (let i = 0; i < MAX_PASSES; i++) {
+    const before = html;
+    html = html.replace(
+      /<(en-[a-z][a-z0-9-]*)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/gi,
+      '[unsupported: $1]',
+    );
+    if (html === before) break;
+  }
+  return html;
+}
+
+function extractAttr(attrStr, name) {
+  const re = new RegExp(`\\b${name}=["']([^"']*)["']`, 'i');
+  const m = re.exec(attrStr);
+  return m ? m[1] : undefined;
+}
+
+function escapeHtmlAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function stripTags(html) {
+  return String(html).replace(/<[^>]*>/g, '');
+}
+
+function extractPositioningAttrs(attrs) {
+  const parts = [];
+  const style = extractAttr(attrs, 'style');
+  const width = extractAttr(attrs, 'width');
+  const height = extractAttr(attrs, 'height');
+  if (style) parts.push(`style="${escapeHtmlAttr(style)}"`);
+  if (width) parts.push(`width="${escapeHtmlAttr(width)}"`);
+  if (height) parts.push(`height="${escapeHtmlAttr(height)}"`);
+  return parts.length > 0 ? ' ' + parts.join(' ') : '';
+}
+
+module.exports = {
+  enmlToHtml,
+  toOneNoteHtml,
+  enmlToHtmlWithResources,
+  formatEnexDate,
+  // Exposed for testing the v1.3.0 hardening helpers in isolation.
+  convertCodeBlocks,
+  flattenNestedTables,
+  convertFootnotes,
+  convertUnknownEnElements,
+};
