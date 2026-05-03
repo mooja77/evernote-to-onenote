@@ -20,6 +20,31 @@ const MAX_CONCURRENCY = 10;
 
 const VALID_CONFLICT_MODES = ['skip', 'rename', 'overwrite', 'ask'];
 
+
+// v1.3.0: Stored Microsoft session lives in two files next to the project
+// root (matching auth.js paths). --reauth deletes them so the next sign-in
+// starts clean. Returns the list of files actually deleted (empty if none
+// existed).
+function clearStoredAuthFiles() {
+  const projectRoot = path.resolve(__dirname, '..');
+  const candidates = [
+    path.join(projectRoot, '.access-token'),
+    path.join(projectRoot, 'msal-cache.json'),
+  ];
+  const cleared = [];
+  for (const f of candidates) {
+    try {
+      if (fs.existsSync(f)) {
+        fs.unlinkSync(f);
+        cleared.push(path.basename(f));
+      }
+    } catch (err) {
+      console.warn('Could not delete ' + path.basename(f) + ': ' + err.message);
+    }
+  }
+  return cleared;
+}
+
 function checkNodeVersion({ exit = process.exit, stdout = console.log, stderr = console.error } = {}) {
   const [major] = process.versions.node.split('.').map(Number);
   if (major < 18) {
@@ -481,9 +506,31 @@ async function main() {
   if (!checkNodeVersion()) return;
 
   let args = process.argv.slice(2);
-  const setupRequested = args[0] === 'setup';
+  // 'setup' or 'wizard' positional → --guided flag (same code path).
+  const setupRequested = args[0] === 'setup' || args[0] === 'wizard';
   if (setupRequested) {
     args = ['--guided', ...args.slice(1)];
+  }
+
+  // v1.3.0: --reauth clears stored Microsoft session before re-running the
+  // sign-in flow. Useful when the saved token expired or the user wants to
+  // switch accounts. Treated as a superset of --auth.
+  if (args.includes('--reauth')) {
+    const cleared = clearStoredAuthFiles();
+    if (cleared.length > 0) {
+      console.log('Cleared stored sign-in: ' + cleared.join(', '));
+    } else {
+      console.log('No stored sign-in to clear; running --auth flow now.');
+    }
+    await runAuthFlow();
+    console.log('');
+    console.log('─────────────────────────────────────────────');
+    console.log('Re-authentication complete.');
+    console.log('');
+    console.log('Next step — preview your notes before importing:');
+    console.log('  evernote-to-onenote --batch <folder-with-enex-files> --dry-run');
+    console.log('');
+    process.exit(0);
   }
 
   if (args.includes('--auth')) {
@@ -542,6 +589,8 @@ async function main() {
       '',
       'Usage:',
       '  evernote-to-onenote --auth                     Sign in to Microsoft (once)',
+      '  evernote-to-onenote --reauth                   Re-sign-in (clears the saved session first)',
+      '  evernote-to-onenote wizard                     Beginner setup helper (alias for `setup`)',
       '  evernote-to-onenote --batch <dir> --dry-run    Preview (no data sent to OneNote)',
       '  evernote-to-onenote --batch <dir>              Run the import',
       '  evernote-to-onenote --verify                   Check import completed correctly',
@@ -551,6 +600,8 @@ async function main() {
       '',
       'All options:',
       '  --guided               Step-by-step prompts; starts with a safe preview',
+      '  --wizard               Same as --guided (preferred name)',
+      '  --reauth               Clear the saved Microsoft sign-in and re-authenticate',
       '  --no-interactive       Never open prompts; print next-step usage instead',
       '  --auth                 Sign in to Microsoft and save your session, then exit',
       '  --batch <dir>          Import all .enex files in a folder',
@@ -586,7 +637,8 @@ async function main() {
   const yearSections = args.includes('--year-sections');
   const verify = args.includes('--verify');
   const noInteractive = args.includes('--no-interactive');
-  const guidedRequested = args.includes('--guided');
+  // v1.3.0: --wizard is the recommended name; --guided kept for back-compat.
+  const guidedRequested = args.includes('--guided') || args.includes('--wizard');
 
   // Guided mode: --guided flag OR no args on a TTY -> interactive prompts.
   let interactiveFiles = null;
@@ -969,6 +1021,7 @@ if (require.main === module) {
 
 module.exports = {
   importNotes,
+  clearStoredAuthFiles,  // v1.3.0 — exposed for unit tests
   runVerify,
   checkNodeVersion,
   hasSavedMicrosoftSession,
