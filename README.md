@@ -99,6 +99,27 @@ Compares the number of notes imported against the number of pages in OneNote. Ex
 
 ---
 
+## Which mode should I use?
+
+There are two ways to read your notes — pick whichever applies:
+
+| Mode | When to use it | Command |
+|---|---|---|
+| **`--batch`** *(recommended)* | You can export `.enex` files from Evernote (File → Export → ENEX). Highest fidelity — includes images, attachments, and full formatting. | `evernote-to-onenote --batch ./Evernote-Export` |
+| **`--from-local`** | The Evernote API has been suspended on your account, you can't export `.enex`, and Evernote v10/v11 is installed on this computer. **Text-only:** images and attachments are not migrated. | `evernote-to-onenote --from-local` |
+
+**Decision tree:**
+
+1. Can you click **File → Export Notes → ENEX format** in Evernote and get a `.enex` file? **Yes →** use `--batch`.
+2. Otherwise, is **Evernote v10 or v11** installed on this computer, and has it opened at least once while signed in? **Yes →** use `--from-local`.
+3. Otherwise — install Evernote v10/v11, sign in once, and let it sync. Then re-run with `--from-local`.
+
+`--from-local` reads Evernote's local cache file in **read-only** mode — your Evernote data is not changed. Close Evernote completely before running it, or you may see a "database locked" error.
+
+If you started with `--from-local` but later get your `.enex` export working, just run `--batch` — the importer will skip notes already imported (`progress.json` tracks both modes).
+
+---
+
 ## Not technical? Use guided mode
 
 Run with no arguments for a step-by-step experience that asks for your folder path, shows you what it found, and starts with a safe preview:
