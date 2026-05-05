@@ -13,9 +13,18 @@ const { loadProgress, saveProgress, markImported, isImported, verifyImport } = r
 const { applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES } = require('./tags');
 const { createGlobalBackoff, createWriteQueue, runParallel } = require('./parallel');
 const { ProgressBar, describeError, interactiveSetup } = require('./ui');
+const {
+  LOCAL_FILENAME_SLOT,
+  LOCAL_NOTEBOOK_NAME,
+  discoverCacheFile,
+  openReadOnly,
+  detectSchema,
+  iterateNotes: iterateLocalNotes,
+  summarizeCache,
+} = require('./local-cache-reader');
 const { version } = require('../package.json');
 
-const FLAGS_WITH_VALUES = ['--batch', '--output-html', '--tags-strategy', '--on-conflict', '--concurrency', '--notebooks', '--date-range', '--report'];
+const FLAGS_WITH_VALUES = ['--batch', '--output-html', '--tags-strategy', '--on-conflict', '--concurrency', '--notebooks', '--date-range', '--report', '--cache-path'];
 const MAX_CONCURRENCY = 10;
 
 const VALID_CONFLICT_MODES = ['skip', 'rename', 'overwrite', 'ask'];
@@ -581,6 +590,9 @@ async function main() {
       '  Step 3 — Run the import:',
       '    evernote-to-onenote --batch ./Evernote-Export',
       '',
+      'No .enex file? Try local-cache mode (Evernote v10/v11 must be installed):',
+      '    evernote-to-onenote --from-local --dry-run',
+      '',
       'Optional step — verify the import completed:',
       '    evernote-to-onenote --verify',
       '',
@@ -605,6 +617,11 @@ async function main() {
       '  --no-interactive       Never open prompts; print next-step usage instead',
       '  --auth                 Sign in to Microsoft and save your session, then exit',
       '  --batch <dir>          Import all .enex files in a folder',
+      '  --from-local           Use notes stored on this computer by the Evernote app.',
+      '                         No .enex export file needed. Evernote must be installed',
+      '                         and must have opened at least once while connected to the internet.',
+      '  --cache-path <path>    Override the auto-detected Evernote cache file or folder',
+      '                         (advanced; only needed if --from-local cannot find your cache).',
       '  --dry-run              Preview what would be imported — nothing is written to OneNote',
       '  --report <path>        Save the dry-run summary to a file (default: ./dry-run-report.txt)',
       '  --no-report            Skip writing the dry-run report file',
@@ -672,6 +689,16 @@ async function main() {
   }
 
   const batchDir = argValue(args, '--batch');
+  const fromLocal = args.includes('--from-local');
+  const cachePathArg = argValue(args, '--cache-path');
+  if (args.includes('--cache-path') && !cachePathArg) {
+    console.error('Error: --cache-path requires a path argument');
+    process.exit(1);
+  }
+  if (cachePathArg && !fromLocal) {
+    console.error('Error: --cache-path can only be used with --from-local');
+    process.exit(1);
+  }
   const outputHtmlDir = argValue(args, '--output-html');
   const tagsStrategyRaw = argValue(args, '--tags-strategy') || 'page-metadata';
   if (!VALID_STRATEGIES.includes(tagsStrategyRaw)) {
@@ -716,9 +743,28 @@ async function main() {
     }
   }
 
+  // Mutual exclusion: --from-local replaces .enex input.
+  if (fromLocal) {
+    const positional = args.find((a, i) => {
+      if (a.startsWith('--')) return false;
+      const prev = args[i - 1];
+      if (prev && FLAGS_WITH_VALUES.includes(prev)) return false;
+      return true;
+    });
+    if (batchDir || positional || interactiveFiles) {
+      console.error('Error: --from-local cannot be combined with --batch or a .enex file path.');
+      console.error('  Pick one source: either local cache (--from-local) or .enex export (--batch).');
+      process.exit(1);
+    }
+  }
+
   // Collect .enex files
   let enexFiles = [];
-  if (interactiveFiles) {
+  if (fromLocal) {
+    // Local-cache mode runs its own loop below. Use a sentinel to keep
+    // the no-source guard happy.
+    enexFiles = [LOCAL_FILENAME_SLOT];
+  } else if (interactiveFiles) {
     enexFiles = interactiveFiles;
   } else if (batchDir) {
     const resolvedDir = path.resolve(batchDir);
@@ -876,21 +922,105 @@ async function main() {
   // one per .enex, mirroring Evernote's notebook list exactly.
   if (!verify) for (let fi = 0; fi < enexFiles.length; fi++) {
     const filePath = enexFiles[fi];
-    const filename = path.basename(filePath);
-    const notebookName = sanitizeName(filename.replace(/\.enex$/i, ''));
+    const isLocal = fromLocal && filePath === LOCAL_FILENAME_SLOT;
+    const filename = isLocal ? LOCAL_FILENAME_SLOT : path.basename(filePath);
+    const notebookName = isLocal
+      ? sanitizeName(LOCAL_NOTEBOOK_NAME)
+      : sanitizeName(filename.replace(/\.enex$/i, ''));
 
-    console.log(`\nImporting file ${fi + 1}/${enexFiles.length}: ${filename} → notebook "${notebookName}"`);
+    if (isLocal) {
+      console.log(`\nImporting from local Evernote cache → notebook "${notebookName}"`);
+    } else {
+      console.log(`\nImporting file ${fi + 1}/${enexFiles.length}: ${filename} → notebook "${notebookName}"`);
+    }
 
     let notes;
-    try {
-      notes = await parseEnexFile(filePath);
-    } catch (err) {
-      const hint = describeError(err);
-      console.error(`  Failed to parse: ${err.message}`);
-      if (hint) console.error(hint);
-      else console.error('  → Check the file is a valid .enex export from Evernote');
-      totalFailed++;
-      continue;
+    if (isLocal) {
+      let resolvedCachePath;
+      try {
+        resolvedCachePath = discoverCacheFile({ explicitPath: cachePathArg });
+      } catch (err) {
+        console.error(`  ${err.message}`);
+        totalFailed++;
+        continue;
+      }
+      if (!resolvedCachePath) {
+        console.error('  Could not find an Evernote cache on this computer.');
+        console.error('  Make sure Evernote v10 or v11 is installed and has been opened at least');
+        console.error('  once while signed in. Then re-run this command.');
+        console.error('  If you know where the cache lives, point at it directly:');
+        console.error('    evernote-to-onenote --from-local --cache-path "<path to *RemoteGraph.sql>"');
+        totalFailed++;
+        continue;
+      }
+      console.log(`  Using cache file: ${resolvedCachePath}`);
+      let db;
+      try {
+        db = openReadOnly(resolvedCachePath);
+      } catch (err) {
+        console.error(`  ${err.message}`);
+        totalFailed++;
+        continue;
+      }
+      try {
+        const schema = detectSchema(db);
+        const summary = summarizeCache(db, { schema });
+        console.log(`  ${summary.total} note(s) found in local cache (${summary.withBody} have body text; ${summary.withoutBody} skipped — body not yet downloaded).`);
+        if (summary.withoutBody > 0 && summary.withoutBody >= summary.withBody) {
+          console.log('');
+          console.log('  ╔══════════════════════════════════════════════╗');
+          console.log(`  ║  ${String(summary.withoutBody).padEnd(4)} of ${String(summary.total).padEnd(4)} notes don\'t have content yet  ║`);
+          console.log('  ╚══════════════════════════════════════════════╝');
+          console.log('  These notes exist in Evernote but their content has not been');
+          console.log('  downloaded to this computer. They will be skipped.');
+          console.log('');
+          console.log('  To include them:');
+          console.log('    1. Open Evernote on this computer.');
+          console.log('    2. Right-click each notebook → "Make available offline".');
+          console.log('    3. Wait for the sync icon to finish (bottom-left of Evernote).');
+          console.log('    4. Close Evernote completely.');
+          console.log('    5. Re-run: evernote-to-onenote --from-local --dry-run');
+          console.log('');
+        }
+
+        notes = [];
+        const localSkips = { noBody: [], unparseable: 0 };
+        try {
+          for (const item of iterateLocalNotes(db, { schema })) {
+            if (item && item._skip) {
+              if (item.reason === 'no-body') localSkips.noBody.push(item.guid || '<unknown>');
+              else if (item.reason === 'unparseable-metadata') localSkips.unparseable++;
+              continue;
+            }
+            notes.push(item);
+          }
+        } catch (err) {
+          console.error(`  Failed to read cache: ${err.message}`);
+          totalFailed++;
+          continue;
+        }
+        if (localSkips.noBody.length > 0) {
+          const preview = localSkips.noBody.slice(0, 3).join(', ');
+          const more = localSkips.noBody.length > 3 ? `, +${localSkips.noBody.length - 3} more` : '';
+          console.log(`  ⚠ ${localSkips.noBody.length} note(s) skipped — content not yet downloaded (guids: ${preview}${more})`);
+        }
+        if (localSkips.unparseable > 0) {
+          console.log(`  ⚠ ${localSkips.unparseable} note(s) skipped — could not read metadata`);
+        }
+      } finally {
+        try { db.close(); } catch { /* ignore */ }
+      }
+    } else {
+      try {
+        notes = await parseEnexFile(filePath);
+      } catch (err) {
+        const hint = describeError(err);
+        console.error(`  Failed to parse: ${err.message}`);
+        if (hint) console.error(hint);
+        else console.error('  → Check the file is a valid .enex export from Evernote');
+        totalFailed++;
+        continue;
+      }
     }
 
     if (dateRange) {
@@ -960,7 +1090,8 @@ async function main() {
     if (totalFailed > 0) console.log(`  Failed:   ${totalFailed}`);
     console.log('');
     console.log('When you are ready to import for real, remove --dry-run:');
-    console.log('  evernote-to-onenote --batch <dir>');
+    if (fromLocal) console.log('  evernote-to-onenote --from-local');
+    else console.log('  evernote-to-onenote --batch <dir>');
   } else {
     console.log('Done.');
     console.log(`  Imported: ${totalSucceeded}`);
@@ -969,7 +1100,8 @@ async function main() {
       console.log(`  Failed:   ${totalFailed}`);
       console.log('');
       console.log('Some notes failed. To retry failed notes, run:');
-      console.log('  evernote-to-onenote --batch <dir> --resume');
+      if (fromLocal) console.log('  evernote-to-onenote --from-local --resume');
+      else console.log('  evernote-to-onenote --batch <dir> --resume');
     }
     if (totalFailed === 0 && totalSucceeded > 0) {
       console.log('');
