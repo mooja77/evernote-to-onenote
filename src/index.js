@@ -985,12 +985,18 @@ async function main() {
 
         notes = [];
         const localSkips = { noBody: [], unparseable: 0 };
+        let totalScrubbedResources = 0;
+        let notesWithScrubbedResources = 0;
         try {
           for (const item of iterateLocalNotes(db, { schema })) {
             if (item && item._skip) {
               if (item.reason === 'no-body') localSkips.noBody.push(item.guid || '<unknown>');
               else if (item.reason === 'unparseable-metadata') localSkips.unparseable++;
               continue;
+            }
+            if (item && item._scrubbedResourceCount > 0) {
+              totalScrubbedResources += item._scrubbedResourceCount;
+              notesWithScrubbedResources++;
             }
             notes.push(item);
           }
@@ -1006,6 +1012,12 @@ async function main() {
         }
         if (localSkips.unparseable > 0) {
           console.log(`  ⚠ ${localSkips.unparseable} note(s) skipped — could not read metadata`);
+        }
+        if (totalScrubbedResources > 0) {
+          console.log(
+            `  ⚠ ${totalScrubbedResources} attachment(s)/image(s) across ${notesWithScrubbedResources} note(s) replaced with placeholders`
+          );
+          console.log('     (full-fidelity images/attachments require --batch with .enex export)');
         }
       } finally {
         try { db.close(); } catch { /* ignore */ }

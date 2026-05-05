@@ -62,6 +62,30 @@ function getCandidateCacheDirs() {
   return dirs;
 }
 
+/**
+ * On macOS the App Store build of Evernote ("sandboxed") stores notes in a
+ * Core Data SQLite file with a different schema (Z-prefixed tables — ZENNOTE,
+ * ZGUID, ZLOCALUUID) instead of the conduit-storage layout this importer
+ * understands. Probing the well-known container path lets us emit a specific
+ * error rather than the generic "could not find a cache" message, which would
+ * otherwise leave App Store users stuck with no clear next step.
+ */
+function findSandboxedDarwinStore() {
+  if (process.platform !== 'darwin') return null;
+  const home = os.homedir();
+  const candidates = [
+    path.join(home, 'Library', 'Containers', 'com.evernote.Evernote',
+      'Data', 'Library', 'Application Support', 'com.evernote.Evernote',
+      'accounts', 'www.evernote.com'),
+    path.join(home, 'Library', 'Containers', 'com.evernote.Evernote',
+      'Data', 'Library', 'Application Support', 'com.evernote.Evernote'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return null;
+}
+
 function findSqlInDir(dir) {
   let entries;
   try { entries = fs.readdirSync(dir); } catch { return null; }
@@ -107,6 +131,21 @@ function discoverCacheFile({ explicitPath = null } = {}) {
     if (!fs.existsSync(dir)) continue;
     const found = findSqlInDir(dir);
     if (found) return found;
+  }
+
+  // No conduit-storage layout found. On macOS, check whether this is the
+  // App Store sandboxed build — its data lives in a Core Data SQLite file
+  // with an entirely different schema, which this importer does not support.
+  // Surface a specific error so the user knows to install Evernote Legacy
+  // or the direct download from evernote.com instead of staring at "could
+  // not find an Evernote cache" with no path forward.
+  if (findSandboxedDarwinStore()) {
+    throw new Error(
+      'Evernote App Store (sandboxed) build detected.\n' +
+      '  This version stores notes in a Core Data format that --from-local does not support.\n' +
+      '  Install Evernote Legacy or the direct download from https://evernote.com/download,\n' +
+      '  sign in there, let it sync, then re-run --from-local.'
+    );
   }
   return null;
 }
@@ -219,6 +258,21 @@ function scrubLocalResourceRefs(html) {
   return html;
 }
 
+/**
+ * Count local-resource references in cached HTML without mutating it.
+ * Used by index.js to surface per-note attachment counts in the dry-run
+ * summary so the operator knows how many in-line images / files would be
+ * dropped. Mirrors the regexes in scrubLocalResourceRefs() exactly.
+ */
+function countLocalResourceRefs(html) {
+  if (!html || typeof html !== 'string') return 0;
+  const imgRe =
+    /<img\b[^>]*\bsrc=(["'])(evernote\+resource:\/\/|file:\/\/|[a-zA-Z]:\\|\/[^/])[^"']*\1[^>]*\/?\s*>/gi;
+  const aRe =
+    /<a\b[^>]*\bhref=(["'])evernote\+resource:\/\/[^"']*\1[^>]*>([\s\S]*?)<\/a>/gi;
+  return (html.match(imgRe) || []).length + (html.match(aRe) || []).length;
+}
+
 function buildTagLookup(db, schema) {
   const map = new Map();
   if (!schema.hasNodesTag) return map;
@@ -302,7 +356,10 @@ function* iterateNotes(db, { schema = null } = {}) {
   if (!s.hasNodesNote) {
     throw new Error(
       'This SQLite file does not look like an Evernote cache (no Nodes_Note table).\n' +
-      '  Confirm Evernote v10 or v11 is installed, or pass --cache-path "<file>" explicitly.'
+      '  Confirm Evernote v10 or v11 is installed, or pass --cache-path "<file>" explicitly.\n' +
+      '  If you are using Evernote from the Mac App Store, that version uses a different\n' +
+      '  storage format and is not supported. Install Evernote Legacy or the direct\n' +
+      '  download from https://evernote.com/download.'
     );
   }
 
@@ -355,6 +412,7 @@ function* iterateNotes(db, { schema = null } = {}) {
       continue;
     }
 
+    const scrubbedResourceCount = countLocalResourceRefs(body);
     const wrapped = `<en-note>${scrubLocalResourceRefs(body)}</en-note>`;
 
     yield {
@@ -367,6 +425,7 @@ function* iterateNotes(db, { schema = null } = {}) {
       author: fields.author || null,
       sourceUrl: fields.sourceUrl || fields.sourceURL || null,
       _guid: row.id,
+      _scrubbedResourceCount: scrubbedResourceCount,
     };
   }
 }
@@ -392,17 +451,26 @@ function summarizeCache(db, { schema = null } = {}) {
     const cacheCols = getColumnsOf(db, 'CacheLookaside');
     const cacheIdCol = pickColumn(cacheCols, 'TKey', 'key', 'id');
     if (cacheIdCol) {
+      // The original implementation OR'd all four candidate shapes inside a
+      // single JOIN, which forced SQLite onto a full Nodes_Note ×
+      // CacheLookaside scan: multi-second on 10k+ note vaults. Run each
+      // shape as its own EXISTS subquery — each one uses the index on the
+      // CacheLookaside key column — then UNION the matching note ids and
+      // count distinct rows. Same result as the OR'd JOIN, faster by orders
+      // of magnitude on real-sized vaults.
+      const nIdQ = quoteIdent(noteIdCol);
+      const cIdQ = quoteIdent(cacheIdCol);
+      const subqueries = [
+        `SELECT n.${nIdQ} AS id FROM Nodes_Note n WHERE EXISTS (SELECT 1 FROM CacheLookaside c WHERE c.${cIdQ} = n.${nIdQ})`,
+        `SELECT n.${nIdQ} AS id FROM Nodes_Note n WHERE EXISTS (SELECT 1 FROM CacheLookaside c WHERE c.${cIdQ} = 'Note:' || n.${nIdQ})`,
+        `SELECT n.${nIdQ} AS id FROM Nodes_Note n WHERE EXISTS (SELECT 1 FROM CacheLookaside c WHERE c.${cIdQ} = 'note:' || n.${nIdQ})`,
+        `SELECT n.${nIdQ} AS id FROM Nodes_Note n WHERE EXISTS (SELECT 1 FROM CacheLookaside c WHERE c.${cIdQ} = 'Note:' || n.${nIdQ} || ':content')`,
+      ];
       try {
-        // Count Nodes_Note rows that have any matching CacheLookaside entry.
         const r = db.prepare(
-          `SELECT COUNT(DISTINCT n.${quoteIdent(noteIdCol)}) AS c FROM Nodes_Note n ` +
-          `JOIN CacheLookaside c ON ` +
-          `c.${quoteIdent(cacheIdCol)} = n.${quoteIdent(noteIdCol)} ` +
-          `OR c.${quoteIdent(cacheIdCol)} = 'Note:' || n.${quoteIdent(noteIdCol)} ` +
-          `OR c.${quoteIdent(cacheIdCol)} = 'note:' || n.${quoteIdent(noteIdCol)} ` +
-          `OR c.${quoteIdent(cacheIdCol)} = 'Note:' || n.${quoteIdent(noteIdCol)} || ':content'`
+          `SELECT COUNT(*) AS c FROM (${subqueries.join(' UNION ')})`
         ).get();
-        withBody = r.c || 0;
+        withBody = (r && r.c) || 0;
       } catch {
         withBody = 0;
       }
@@ -426,6 +494,8 @@ module.exports = {
   iterateNotes,
   summarizeCache,
   scrubLocalResourceRefs,
+  countLocalResourceRefs,
+  findSandboxedDarwinStore,
   ensureEnexDate,
   // exposed for tests
   _internals: { quoteIdent, getColumnsOf, pickColumn, buildTagLookup, makeBodyLookup },
