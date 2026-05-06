@@ -86,20 +86,36 @@ function findSandboxedDarwinStore() {
   return null;
 }
 
-function findSqlInDir(dir) {
+function findSqlInDir(dir, depth = 2) {
+  // Recurse one level by default — conduit-storage on real installs has the
+  // SQL files inside a per-host subfolder (e.g. https%3A%2F%2Fwww.evernote.com)
+  // not at the top level. v1.4.0 shipped without recursion and silently
+  // failed auto-detect; this is the fix.
   let entries;
   try { entries = fs.readdirSync(dir); } catch { return null; }
   const matches = [];
+  const subdirs = [];
   for (const e of entries) {
     const full = path.join(dir, e);
     let stat;
     try { stat = fs.statSync(full); } catch { continue; }
-    if (!stat.isFile()) continue;
-    // Evernote v10/v11 typically writes:
-    //   UDB-User<id>+RemoteGraph.sql
-    // Match anything ending in RemoteGraph.sql — covers personal & business graphs.
-    if (/RemoteGraph\.sql$/i.test(e)) {
-      matches.push({ full, mtime: stat.mtimeMs });
+    if (stat.isFile()) {
+      // Evernote v10/v11 typically writes:
+      //   UDB-User<id>+RemoteGraph.sql
+      // Match anything ending in RemoteGraph.sql — covers personal & business graphs.
+      if (/RemoteGraph\.sql$/i.test(e)) {
+        matches.push({ full, mtime: stat.mtimeMs });
+      }
+    } else if (stat.isDirectory() && depth > 0) {
+      subdirs.push(full);
+    }
+  }
+  // Recurse only if no top-level matches; saves a stat() per file on the
+  // common --cache-path-points-at-the-folder-with-the-files case.
+  if (matches.length === 0) {
+    for (const sub of subdirs) {
+      const found = findSqlInDir(sub, depth - 1);
+      if (found) matches.push({ full: found, mtime: 0 });
     }
   }
   if (matches.length === 0) return null;
@@ -369,6 +385,29 @@ function* iterateNotes(db, { schema = null } = {}) {
   const noteCols = getColumnsOf(db, 'Nodes_Note');
   const idCol = pickColumn(noteCols, 'TKey', 'guid', 'id');
   const valCol = pickColumn(noteCols, 'TValue', 'value', 'data');
+
+  // Evernote v11 (released 2026-01-19) replaced the v10 TKey/TValue JSON-blob
+  // shape with flat columns (id, label, snippet, content_hash, created,
+  // updated, parent_Notebook_id, ...). The CacheLookaside body table was also
+  // dropped — bodies live in Offline_Search_Note_Content as plain text only,
+  // not the HTML/ENML this importer expects. Detect this layout up front and
+  // refuse with actionable guidance instead of "no recognised id/value
+  // columns" which leaves the operator stuck.
+  const isV11FlatSchema = !valCol && noteCols.has('id') && noteCols.has('content_hash') && noteCols.has('snippet');
+  if (isV11FlatSchema) {
+    throw new Error(
+      'Detected Evernote v11 desktop cache (flat-column schema), which --from-local does not support.\n' +
+      '  v11 stores note metadata as flat columns and only plain-text bodies\n' +
+      '  in Offline_Search_Note_Content — the HTML/ENML this importer needs is\n' +
+      '  not stored locally on v11. Two options:\n' +
+      '    1. Export your notebooks as .enex from Evernote, then run:\n' +
+      '         evernote-to-onenote --batch <export-folder>\n' +
+      '    2. Install Evernote v10 (the previous desktop release) — its local\n' +
+      '       cache uses the older schema this importer can read.\n' +
+      '  Tracking issue: https://github.com/mooja77/evernote-to-onenote/issues'
+    );
+  }
+
   if (!idCol || !valCol) {
     throw new Error(
       'Unexpected Nodes_Note schema (no recognised id/value columns).\n' +
@@ -442,6 +481,15 @@ function summarizeCache(db, { schema = null } = {}) {
 
   const noteCols = getColumnsOf(db, 'Nodes_Note');
   const noteIdCol = pickColumn(noteCols, 'TKey', 'guid', 'id');
+  // Evernote v11 has flat columns (no TKey/TValue) and no CacheLookaside.
+  // Mark unsupported so the caller doesn't print misleading totals like
+  // "2073 of 2073 notes don't have content yet" when in fact zero are
+  // extractable. iterateNotes() throws a v11-specific error with guidance.
+  const isV11FlatSchema = !pickColumn(noteCols, 'TValue', 'value', 'data')
+    && noteCols.has('id') && noteCols.has('content_hash') && noteCols.has('snippet');
+  if (isV11FlatSchema) {
+    return { total: 0, withBody: 0, withoutBody: 0, available: false, unsupportedSchema: 'v11-flat' };
+  }
   if (!noteIdCol) return { total: 0, withBody: 0, withoutBody: 0, available: false };
 
   const total = db.prepare('SELECT COUNT(*) AS c FROM Nodes_Note').get().c;

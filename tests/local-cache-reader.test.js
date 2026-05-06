@@ -284,3 +284,56 @@ describe('local-cache-reader — module surface', () => {
     assert.equal(LOCAL_FILENAME_SLOT, '__local__');
   });
 });
+
+// v1.4.1 regression coverage — these are the two bugs that shipped in 1.4.0
+// and surfaced on the first real test against an actual Evernote v11 install.
+describe('local-cache-reader — v1.4.1 regressions', () => {
+  test('detects v11 flat-column schema and refuses with actionable error', () => {
+    const db = new Database(':memory:');
+    // Mimic v11 layout: flat columns, no TKey/TValue, no CacheLookaside.
+    db.exec(`
+      CREATE TABLE Nodes_Note (
+        id TEXT PRIMARY KEY,
+        label TEXT,
+        snippet TEXT,
+        content_hash TEXT,
+        content_size REAL,
+        created INTEGER,
+        updated INTEGER,
+        deleted INTEGER,
+        markedForOffline INTEGER,
+        parent_Notebook_id TEXT
+      );
+    `);
+    db.prepare(`INSERT INTO Nodes_Note (id, label, content_hash, snippet) VALUES ('a', 'A', 'h1', 's1')`).run();
+
+    let err;
+    try { for (const _ of iterateNotes(db)) { /* drain */ } }
+    catch (e) { err = e; }
+    assert.ok(err, 'iterateNotes should throw on v11 schema');
+    assert.match(err.message, /v11/i);
+    assert.match(err.message, /--batch/);
+
+    const summary = summarizeCache(db);
+    assert.equal(summary.unsupportedSchema, 'v11-flat');
+    assert.equal(summary.available, false);
+    db.close();
+  });
+
+  test('discoverCacheFile recurses one level into a per-host subfolder', () => {
+    // Real Evernote conduit-storage layout: top-level dir → per-host
+    // subfolder (https%3A%2F%2Fwww.evernote.com) → UDB-User<id>+RemoteGraph.sql
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'efl-recurse-'));
+    const subdir = path.join(tmpRoot, 'https%3A%2F%2Fwww.evernote.com');
+    fs.mkdirSync(subdir);
+    const sqlPath = path.join(subdir, 'UDB-User999+RemoteGraph.sql');
+    // Empty file — discover only checks the name pattern, doesn't open.
+    fs.writeFileSync(sqlPath, '');
+    try {
+      const found = discoverCacheFile({ explicitPath: tmpRoot });
+      assert.equal(found, sqlPath);
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
