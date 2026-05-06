@@ -965,6 +965,22 @@ async function main() {
       try {
         const schema = detectSchema(db);
         const summary = summarizeCache(db, { schema });
+        // v1.4.1 — short-circuit on Evernote v11 flat-column schema. The
+        // body content available on v11 is plain text only (no HTML/ENML),
+        // so --from-local cannot produce a faithful import. Tell the
+        // operator clearly and stop before iterateLocalNotes throws.
+        if (summary.unsupportedSchema === 'v11-flat') {
+          console.error('  Evernote v11 desktop cache detected — --from-local does not support v11.');
+          console.error('  v11 only stores plain-text bodies locally; the HTML/ENML this importer');
+          console.error('  needs is fetched on-demand from Evernote\'s server and not cached on disk.');
+          console.error('  Use --batch with an ENEX export instead:');
+          console.error('    1. In Evernote: right-click a notebook → Export Notebook → ENEX format');
+          console.error('    2. Save .enex files to a folder (e.g. ./Evernote-Export)');
+          console.error('    3. Run: evernote-to-onenote --batch ./Evernote-Export');
+          totalFailed++;
+          try { db.close(); } catch { /* ignore */ }
+          continue;
+        }
         console.log(`  ${summary.total} note(s) found in local cache (${summary.withBody} have body text; ${summary.withoutBody} skipped — body not yet downloaded).`);
         if (summary.withoutBody > 0 && summary.withoutBody >= summary.withBody) {
           console.log('');

@@ -106,15 +106,17 @@ There are two ways to read your notes — pick whichever applies:
 | Mode | When to use it | Command |
 |---|---|---|
 | **`--batch`** *(recommended)* | You can export `.enex` files from Evernote (File → Export → ENEX). Highest fidelity — includes images, attachments, and full formatting. | `evernote-to-onenote --batch ./Evernote-Export` |
-| **`--from-local`** | The Evernote API has been suspended on your account, you can't export `.enex`, and Evernote v10/v11 is installed on this computer. **Text-only:** images and attachments are not migrated. | `evernote-to-onenote --from-local` |
+| **`--from-local`** | You can't export `.enex` and **Evernote v10** is installed on this computer. **Text-only** — images and attachments are not migrated. **Does not support Evernote v11** (released 2026-01-19) — v11 doesn't keep the HTML body locally. | `evernote-to-onenote --from-local` |
 
 **Decision tree:**
 
-1. Can you click **File → Export Notes → ENEX format** in Evernote and get a `.enex` file? **Yes →** use `--batch`.
-2. Otherwise, is **Evernote v10 or v11** installed on this computer, and has it opened at least once while signed in? **Yes →** use `--from-local`.
-3. Otherwise — install Evernote v10/v11, sign in once, and let it sync. Then re-run with `--from-local`.
+1. Can you click **File → Export Notes → ENEX format** in Evernote and get a `.enex` file? **Yes →** use `--batch`. *(This is the only path that works on Evernote v11, the current desktop release.)*
+2. Otherwise, is **Evernote v10** installed on this computer, and has it opened at least once while signed in? **Yes →** use `--from-local`.
+3. Otherwise — fall back to `--batch`. v11 users must export to ENEX; the local-cache path doesn't have what we need.
 
 `--from-local` reads Evernote's local cache file in **read-only** mode — your Evernote data is not changed. Close Evernote completely before running it, or you may see a "database locked" error.
+
+**Why no v11 support:** Evernote v11 reworked the local cache. Note bodies are now stored as plain search-index text only; the HTML/ENML this importer needs is fetched on-demand from the server and not cached locally. `--from-local` detects v11 at runtime and refuses with a message pointing you at `--batch`.
 
 If you started with `--from-local` but later get your `.enex` export working, just run `--batch` — the importer will skip notes already imported (`progress.json` tracks both modes).
 
