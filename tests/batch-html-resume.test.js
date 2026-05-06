@@ -304,6 +304,39 @@ describe('CLI — --output-html mode', () => {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
   });
+
+  // v1.4.2 regression — `--output-html` must resolve `name:partN` multipart-form
+  // refs to relative file paths and write each resource to a sibling assets
+  // folder. v1.4.0/1.4.1 emitted the OneNote-API multipart placeholders into
+  // static HTML, leaving images broken in any browser/note app. Real test
+  // against `tests/fixtures/with-resources.enex` (one note, one inline image).
+  test('writes resources to <name>.assets/ and rewrites src/data refs', () => {
+    const outDir = makeTempDir('html-resources');
+    try {
+      const { status } = run([fix('with-resources.enex'), '--output-html', outDir]);
+      assert.equal(status, 0);
+      const files = findHtmlFiles(outDir);
+      assert.ok(files.length > 0, 'expected at least one HTML file');
+      const content = fs.readFileSync(files[0], 'utf8');
+      // No leftover multipart-form refs.
+      assert.doesNotMatch(content, /\bsrc=["']name:/);
+      assert.doesNotMatch(content, /\bdata=["']name:/);
+      // Should reference an .assets/<part>.<ext> file via relative path.
+      assert.match(content, /\.assets\/part\d+\.[a-z0-9]+/i);
+      // The .assets folder must exist alongside the HTML file with a real file.
+      const noteDir = path.dirname(files[0]);
+      const assetsDirs = fs.readdirSync(noteDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.endsWith('.assets'))
+        .map(d => path.join(noteDir, d.name));
+      assert.ok(assetsDirs.length > 0, 'expected at least one .assets folder');
+      const assetFiles = fs.readdirSync(assetsDirs[0]);
+      assert.ok(assetFiles.length > 0, 'expected at least one resource file in .assets');
+      // The asset file should have a real extension (not .bin) for known mime types.
+      assert.match(assetFiles[0], /^part\d+\.[a-z0-9]+$/i);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Resume / progress tracking ───────────────────────────────────────────────
