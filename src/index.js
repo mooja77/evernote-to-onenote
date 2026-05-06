@@ -141,6 +141,50 @@ function sanitizeName(name) {
     .trim() || 'Untitled';
 }
 
+// Map common note-attachment MIME types to file extensions used when --output-html
+// writes resources to sibling files. Falls back to a reasonable default rather than
+// guessing from binary content.
+function mimeToExt(mime) {
+  if (!mime) return null;
+  const m = String(mime).toLowerCase().split(';')[0].trim();
+  const map = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/bmp': 'bmp',
+    'image/tiff': 'tiff',
+    'image/x-icon': 'ico',
+    'application/pdf': 'pdf',
+    'application/zip': 'zip',
+    'application/json': 'json',
+    'application/xml': 'xml',
+    'application/octet-stream': 'bin',
+    'text/plain': 'txt',
+    'text/html': 'html',
+    'text/csv': 'csv',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/ogg': 'ogg',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
+    'video/x-msvideo': 'avi',
+    'video/webm': 'webm',
+  };
+  if (map[m]) return map[m];
+  // Fallback — extract anything after the slash, drop +suffix and parameters.
+  const slash = m.indexOf('/');
+  if (slash > 0) {
+    const tail = m.slice(slash + 1).split('+')[0];
+    if (/^[a-z0-9.-]+$/.test(tail)) return tail;
+  }
+  return null;
+}
+
 function argValue(args, flag) {
   const i = args.indexOf(flag);
   return i !== -1 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : null;
@@ -312,6 +356,32 @@ async function importNotes({
         let counter = 1;
         while (fs.existsSync(outFile)) {
           outFile = path.join(notebookDir, `${safeName} (${counter++}).html`);
+        }
+        // Resolve `name:partN` multipart-form refs to relative file paths.
+        // v1.4.0/1.4.1 emitted the multipart refs verbatim, leaving images
+        // broken in static HTML. Now: write each used resource to a sibling
+        // `<safeName>.assets/<partName>.<ext>` file and rewrite the src/data
+        // attributes accordingly. This makes each .html + .assets folder
+        // pair self-contained and droppable into any note app.
+        if (usedResources.length > 0) {
+          const assetsDirName = `${safeName}.assets`;
+          const assetsDirAbs = path.join(notebookDir, assetsDirName);
+          if (!fs.existsSync(assetsDirAbs)) fs.mkdirSync(assetsDirAbs, { recursive: true });
+          for (const r of usedResources) {
+            const ext = mimeToExt(r.contentType) || 'bin';
+            const fileName = `${r.partName}.${ext}`;
+            const buf = Buffer.isBuffer(r.data) ? r.data : Buffer.from(r.data, 'base64');
+            fs.writeFileSync(path.join(assetsDirAbs, fileName), buf);
+          }
+          html = html.replace(
+            /(\b(?:src|data)=)(["'])name:([^"'\s]+)\2/gi,
+            (_match, attr, q, partName) => {
+              const r = usedResources.find(x => x.partName === partName);
+              const ext = r ? (mimeToExt(r.contentType) || 'bin') : 'bin';
+              const rel = `${assetsDirName}/${partName}.${ext}`.replace(/ /g, '%20');
+              return `${attr}${q}${rel}${q}`;
+            }
+          );
         }
         const meta = preserveMetadata ? { created: note.created, author: note.author, sourceUrl: note.sourceUrl } : null;
         fs.writeFileSync(outFile, toOneNoteHtml(title, html, meta), 'utf8');
@@ -1133,9 +1203,19 @@ async function main() {
     }
     if (totalFailed === 0 && totalSucceeded > 0) {
       console.log('');
-      console.log('All done! Your notes are in OneNote.');
-      console.log('Run --verify to confirm everything arrived:');
-      console.log('  evernote-to-onenote --verify');
+      if (outputHtmlDir) {
+        const out = path.resolve(outputHtmlDir);
+        console.log(`All done! ${totalSucceeded} note(s) written as HTML to:`);
+        console.log(`  ${out}`);
+        console.log('');
+        console.log('Each notebook is a subfolder; each note is a .html file.');
+        console.log('Notes with images/attachments have a sibling "<noteName>.assets/" folder.');
+        console.log('Drag the folder (or individual .html + .assets pairs) into your note app.');
+      } else {
+        console.log('All done! Your notes are in OneNote.');
+        console.log('Run --verify to confirm everything arrived:');
+        console.log('  evernote-to-onenote --verify');
+      }
     }
   }
 
