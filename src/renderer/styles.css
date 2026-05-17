@@ -1,0 +1,256 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue: #2563eb;
+  --blue-dark: #1d4ed8;
+  --ink: #0f172a;
+  --slate: #475569;
+  --muted: #94a3b8;
+  --line: #e2e8f0;
+  --bg: #f8fafc;
+  --green: #059669;
+  --red: #dc2626;
+  --amber: #b45309;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { display: flex; flex-direction: column; }
+
+/* The hidden attribute must always win — even over component display rules
+   (e.g. .file-chosen{display:flex}) that would otherwise out-cascade it. */
+[hidden] { display: none !important; }
+
+/* ── Header + stepper ─────────────────────────────────────────────────── */
+
+header {
+  padding: 1.25rem 2rem 0.5rem;
+  text-align: center;
+}
+header h1 { font-size: 1.25rem; font-weight: 700; }
+header p { color: var(--slate); font-size: 0.9rem; margin-top: 0.15rem; }
+
+.stepper {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem 1rem;
+  flex-wrap: wrap;
+}
+.stepper .step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.stepper .step .dot {
+  width: 1.4rem; height: 1.4rem;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--slate);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.75rem;
+}
+.stepper .step.active { color: var(--ink); font-weight: 600; }
+.stepper .step.active .dot { background: var(--blue); color: #fff; }
+.stepper .step.done .dot { background: var(--green); color: #fff; }
+
+/* ── Main / cards ─────────────────────────────────────────────────────── */
+
+main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem 2rem 2rem;
+  overflow-y: auto;
+}
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 560px;
+}
+.card h2 { font-size: 1.35rem; font-weight: 700; }
+/* h2 receives programmatic focus on each step change (see goStep) — it is
+   not keyboard-reachable, so suppressing the ring is safe. */
+.card h2:focus { outline: none; }
+.card p { color: var(--slate); margin-top: 0.6rem; line-height: 1.55; }
+.card p.hint { font-size: 0.85rem; color: var(--muted); }
+section[hidden] { display: none; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  padding: 0.7rem 1.25rem;
+  font-weight: 600;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--blue-dark); }
+.btn-primary.big { padding: 0.85rem 1.6rem; font-size: 1.05rem; }
+.btn-outline { background: #fff; color: var(--blue); border-color: #bfdbfe; }
+.btn-outline:hover:not(:disabled) { background: #eff6ff; }
+.btn-ghost { background: transparent; color: var(--slate); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+.row { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+
+/* ── Account bar ──────────────────────────────────────────────────────── */
+
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 2rem 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--blue);
+  text-decoration: underline;
+}
+.btn-link:hover { color: var(--blue-dark); }
+
+.waiting { margin-top: 1rem; color: var(--slate); font-size: 0.9rem; }
+
+/* ── File chosen ──────────────────────────────────────────────────────── */
+
+.file-chosen {
+  margin-top: 1.25rem;
+  display: flex; align-items: center; gap: 0.6rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: 9px;
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+}
+
+/* ── Section picker ───────────────────────────────────────────────────── */
+
+/* Capped so the step-3 card (heading + list + new-section + buttons) fits
+   the window without pushing "Start import" off the bottom edge — including
+   when the "create a new section" form is expanded. */
+.notebooks { margin-top: 1.1rem; max-height: 210px; overflow-y: auto; }
+.notebook { margin-bottom: 0.4rem; }
+.nb-name {
+  width: 100%;
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 700; font-size: 0.92rem;
+  color: var(--ink); text-align: left;
+}
+.nb-name:hover:not(:disabled) { background: #f1f5f9; }
+.nb-name:disabled { opacity: 0.55; }
+.nb-name.expanded { border-color: #bfdbfe; }
+.nb-caret { width: 0.85rem; color: var(--muted); font-size: 0.7rem; }
+.nb-label { flex: 1; }
+.nb-count { color: var(--muted); font-weight: 600; font-size: 0.75rem; }
+.nb-sections { padding: 0.35rem 0 0.5rem 0.6rem; }
+.section-opt {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0.3rem 0;
+  cursor: pointer;
+}
+.section-opt:hover { background: var(--bg); }
+.section-opt.selected { border-color: var(--blue); background: #eff6ff; }
+.section-opt input { accent-color: var(--blue); }
+
+/* ── New section ──────────────────────────────────────────────────────── */
+
+.new-section { margin-top: 0.85rem; }
+.new-section-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+.new-section-form select,
+.new-section-form input {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+.new-section-form select { max-width: 44%; }
+.new-section-form input { flex: 1; min-width: 8rem; }
+#new-section-msg { margin-top: 0.5rem; font-size: 0.85rem; color: var(--amber); }
+
+/* ── Progress ─────────────────────────────────────────────────────────── */
+
+.progressbar {
+  margin-top: 1.5rem;
+  height: 12px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressbar > .fill {
+  height: 100%;
+  width: 0%;
+  background: var(--blue);
+  transition: width 0.25s ease;
+}
+.progress-line { margin-top: 0.8rem; font-weight: 600; }
+.progress-note { margin-top: 0.3rem; color: var(--slate); font-size: 0.9rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.counts { margin-top: 0.6rem; font-size: 0.9rem; color: var(--slate); }
+
+/* ── Done ─────────────────────────────────────────────────────────────── */
+
+.result-big { font-size: 2rem; font-weight: 800; margin-top: 0.5rem; }
+.result-line { margin-top: 0.75rem; font-size: 1rem; }
+.tally-ok { color: var(--green); font-weight: 700; }
+.tally-skip { color: var(--amber); font-weight: 700; }
+.tally-fail { color: var(--red); font-weight: 700; }
+
+.spinner {
+  display: inline-block;
+  width: 1rem; height: 1rem;
+  border: 2px solid var(--line);
+  border-top-color: var(--blue);
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 0.4rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-box {
+  margin-top: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 9px;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}

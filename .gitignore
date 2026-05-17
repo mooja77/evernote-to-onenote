@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+
+# Local runtime state (in dev these land next to the app; in the packaged
+# app they live under %APPDATA%). Never commit.
+msal-cache.json
+msal-cache.json.tmp
+progress.json
+progress.json.tmp
+.access-token

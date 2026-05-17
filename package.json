@@ -1,0 +1,45 @@
+{
+  "name": "evernote-to-onenote-desktop",
+  "productName": "Evernote to OneNote",
+  "version": "1.0.3",
+  "description": "Desktop app that migrates an Evernote .enex export into Microsoft OneNote — for non-technical users.",
+  "main": "src/main.js",
+  "author": "John Moore",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooja77/evernote-to-onenote.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.1.2",
+    "form-data": "^4.0.5",
+    "node-fetch": "^2.7.0",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.jmsdevlab.evernote-to-onenote",
+    "productName": "Evernote to OneNote",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

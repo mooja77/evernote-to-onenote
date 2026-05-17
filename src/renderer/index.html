@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self';" />
+  <title>Evernote to OneNote</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Evernote &rarr; OneNote</h1>
+    <p>Move your Evernote notes into Microsoft OneNote.</p>
+  </header>
+
+  <nav class="stepper" id="stepper">
+    <div class="step" data-step="1"><span class="dot">1</span> Sign in</div>
+    <div class="step" data-step="2"><span class="dot">2</span> Choose file</div>
+    <div class="step" data-step="3"><span class="dot">3</span> Pick section</div>
+    <div class="step" data-step="4"><span class="dot">4</span> Import</div>
+    <div class="step" data-step="5"><span class="dot">5</span> Done</div>
+  </nav>
+
+  <div class="account-bar" id="account-bar" hidden>
+    <span id="account-who"></span>
+    <button class="btn-link" id="btn-signout" type="button">Sign out</button>
+  </div>
+
+  <main>
+    <!-- Step 1: Sign in -->
+    <section class="card" id="step-signin">
+      <h2>Sign in to Microsoft</h2>
+      <p>This app needs your permission to add pages to your OneNote. Sign in
+         with the Microsoft account your OneNote is on &mdash; a personal
+         account (Outlook.com, Hotmail) or a work or school account.</p>
+      <div class="row">
+        <button class="btn-primary big" id="btn-signin">Sign in with Microsoft</button>
+      </div>
+
+      <div class="signin-wait" id="signin-wait" hidden>
+        <div class="waiting"><span class="spinner"></span>Opening your web browser for sign-in&hellip;</div>
+        <p class="hint">Sign in there and this app continues automatically. If the
+           browser didn't open, or you closed it, click Cancel and try again.</p>
+        <div class="row">
+          <button class="btn-ghost" id="btn-signin-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+      <div class="error-box" id="signin-error" hidden></div>
+    </section>
+
+    <!-- Step 2: Choose file -->
+    <section class="card" id="step-file" hidden>
+      <h2>Choose your Evernote export</h2>
+      <p>In Evernote, select your notebook and choose
+         <strong>File &rarr; Export Notes</strong>, saving as an
+         <strong>.enex</strong> file. Then pick that file here.</p>
+      <div class="row">
+        <button class="btn-primary big" id="btn-pick">Choose .enex file</button>
+      </div>
+      <div class="file-chosen" id="file-chosen" hidden>
+        <span>&#10003;</span><span id="file-name"></span>
+      </div>
+      <div class="row">
+        <button class="btn-primary" id="btn-file-next" disabled>Next</button>
+      </div>
+    </section>
+
+    <!-- Step 3: Pick section -->
+    <section class="card" id="step-section" hidden>
+      <h2>Where should the notes go?</h2>
+      <p>Pick the OneNote section to import into. Every note becomes a page in
+         that section.</p>
+      <div id="notebooks-loading" class="waiting"><span class="spinner"></span>Loading your OneNote notebooks &mdash; this can take a moment&hellip;</div>
+      <div class="notebooks" id="notebooks" hidden></div>
+
+      <div class="new-section" id="new-section" hidden>
+        <button class="btn-link" id="btn-new-section-toggle" type="button">+ Create a new section</button>
+        <div class="new-section-form" id="new-section-form" hidden>
+          <select id="new-section-notebook" aria-label="Notebook for the new section"></select>
+          <input type="text" id="new-section-name" placeholder="New section name" maxlength="50" aria-label="New section name" />
+          <button class="btn-outline" id="btn-create-section" type="button">Create</button>
+        </div>
+        <div class="hint" id="new-section-msg" hidden></div>
+      </div>
+
+      <div class="error-box" id="section-error" hidden></div>
+      <div class="row">
+        <button class="btn-ghost" id="btn-section-back">Back</button>
+        <button class="btn-outline" id="btn-section-refresh">Refresh</button>
+        <button class="btn-primary" id="btn-start" disabled>Start import</button>
+      </div>
+    </section>
+
+    <!-- Step 4: Importing -->
+    <section class="card" id="step-import" hidden>
+      <h2>Importing&hellip;</h2>
+      <p class="hint">Keep this window open until it finishes. You can stop
+         any time &mdash; nothing already imported is lost.</p>
+      <div class="progressbar" id="progressbar" role="progressbar"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="progress-fill"></div></div>
+      <div class="progress-line" id="progress-line">Starting&hellip;</div>
+      <div class="progress-note" id="progress-note"></div>
+      <div class="counts" id="progress-counts"></div>
+      <div class="row">
+        <button class="btn-ghost" id="btn-cancel">Stop</button>
+      </div>
+    </section>
+
+    <!-- Step 5: Done -->
+    <section class="card" id="step-done" hidden>
+      <h2 id="done-title">Import finished</h2>
+      <div class="result-big" id="done-big"></div>
+      <div class="result-line" id="done-line"></div>
+      <div class="error-box" id="done-errors" hidden></div>
+      <div class="row">
+        <button class="btn-primary big" id="btn-open-onenote">Open OneNote</button>
+        <button class="btn-primary big" id="btn-retry" hidden>Try again</button>
+        <button class="btn-outline" id="btn-force-reimport" hidden>Import these again anyway</button>
+        <button class="btn-outline" id="btn-again">Import another file</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
