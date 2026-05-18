@@ -33,12 +33,12 @@ function getToken() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 920,
-    height: 720,
-    minWidth: 640,
-    minHeight: 560,
+    width: 760,
+    height: 824,
+    minWidth: 680,
+    minHeight: 660,
     title: 'Evernote to OneNote',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef1f6',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

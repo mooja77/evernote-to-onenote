@@ -9,8 +9,25 @@
 </head>
 <body>
   <header>
-    <h1>Evernote &rarr; OneNote</h1>
-    <p>Move your Evernote notes into Microsoft OneNote.</p>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none"
+             xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="brandMark" x1="0" y1="0" x2="40" y2="40"
+                            gradientUnits="userSpaceOnUse">
+              <stop stop-color="#00A82D" />
+              <stop offset="1" stop-color="#6B2FB3" />
+            </linearGradient>
+          </defs>
+          <rect width="40" height="40" rx="11" fill="url(#brandMark)" />
+          <path d="M12.5 20h12.5M19.5 14l6 6-6 6" stroke="#fff"
+                stroke-width="2.7" stroke-linecap="round"
+                stroke-linejoin="round" />
+        </svg>
+      </span>
+      <span class="brand-name">Evernote to OneNote</span>
+    </div>
   </header>
 
   <nav class="stepper" id="stepper">
@@ -58,7 +75,7 @@
         <button class="btn-primary big" id="btn-pick">Choose .enex file</button>
       </div>
       <div class="file-chosen" id="file-chosen" hidden>
-        <span>&#10003;</span><span id="file-name"></span>
+        <span class="file-check" aria-hidden="true">&#10003;</span><span id="file-name"></span>
       </div>
       <div class="row">
         <button class="btn-primary" id="btn-file-next" disabled>Next</button>
@@ -87,7 +104,7 @@
       <div class="row">
         <button class="btn-ghost" id="btn-section-back">Back</button>
         <button class="btn-outline" id="btn-section-refresh">Refresh</button>
-        <button class="btn-primary" id="btn-start" disabled>Start import</button>
+        <button class="btn-primary big" id="btn-start" disabled>Start import</button>
       </div>
     </section>
 

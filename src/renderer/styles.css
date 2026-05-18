@@ -1,24 +1,63 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Evernote to OneNote — desktop app design system
+   Visual layer only. Every class/id hook in app.js is preserved.
+   Offline-safe: system fonts, inline SVG only (CSP blocks network assets).
+   ════════════════════════════════════════════════════════════════════════ */
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --blue: #2563eb;
-  --blue-dark: #1d4ed8;
-  --ink: #0f172a;
-  --slate: #475569;
-  --muted: #94a3b8;
-  --line: #e2e8f0;
-  --bg: #f8fafc;
-  --green: #059669;
-  --red: #dc2626;
-  --amber: #b45309;
+  /* Accent — calm indigo, the spine of the UI */
+  --accent:        #4f46e5;
+  --accent-hover:  #4338ca;
+  --accent-press:  #3730a3;
+  --accent-soft:   #eef2ff;
+  --accent-border: #c7d2fe;
+
+  /* Ink + neutrals */
+  --ink:    #0f172a;
+  --ink-2:  #334155;
+  --muted:  #64748b;
+  --faint:  #94a3b8;
+  --line:   #e6e8ee;
+  --line-2: #eef0f4;
+
+  /* Surfaces */
+  --bg:   #eef1f6;
+  --card: #ffffff;
+
+  /* Status */
+  --green:        #059669;
+  --green-soft:   #ecfdf5;
+  --green-border: #a7f3d0;
+  --green-ink:    #065f46;
+  --red:          #dc2626;
+  --red-soft:     #fef2f2;
+  --red-border:   #fecaca;
+  --red-ink:      #991b1b;
+  --amber:        #b45309;
+
+  /* Brand signature — Evernote green → OneNote purple */
+  --brand-grad: linear-gradient(135deg, #00a82d 0%, #6b2fb3 100%);
+  --bar-grad:   linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+
+  /* Depth */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+                 0 14px 32px -12px rgba(15, 23, 42, 0.16);
+  --shadow-btn:  0 1px 2px rgba(15, 23, 42, 0.10);
+
+  /* Radii */
+  --r-card: 18px;
+  --r-ctrl: 11px;
 }
 
 html, body {
   height: 100%;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 body { display: flex; flex-direction: column; }
@@ -27,186 +66,407 @@ body { display: flex; flex-direction: column; }
    (e.g. .file-chosen{display:flex}) that would otherwise out-cascade it. */
 [hidden] { display: none !important; }
 
-/* ── Header + stepper ─────────────────────────────────────────────────── */
+/* ── Header / brand ──────────────────────────────────────────────────────*/
 
 header {
-  padding: 1.25rem 2rem 0.5rem;
-  text-align: center;
+  padding: 1.6rem 2rem 0.4rem;
+  display: flex;
+  justify-content: center;
 }
-header h1 { font-size: 1.25rem; font-weight: 700; }
-header p { color: var(--slate); font-size: 0.9rem; margin-top: 0.15rem; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.brand-mark {
+  display: flex;
+  filter: drop-shadow(0 4px 10px rgba(107, 47, 179, 0.28));
+}
+.brand-name {
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+
+/* ── Stepper ─────────────────────────────────────────────────────────────*/
 
 .stepper {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 2rem 1rem;
-  flex-wrap: wrap;
+  padding: 1.1rem 2.4rem 1.2rem;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
 }
 .stepper .step {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.stepper .step .dot {
-  width: 1.4rem; height: 1.4rem;
-  border-radius: 999px;
-  background: var(--line);
-  color: var(--slate);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.75rem;
-}
-.stepper .step.active { color: var(--ink); font-weight: 600; }
-.stepper .step.active .dot { background: var(--blue); color: #fff; }
-.stepper .step.done .dot { background: var(--green); color: #fff; }
-
-/* ── Main / cards ─────────────────────────────────────────────────────── */
-
-main {
+  position: relative;
   flex: 1;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 1rem 2rem 2rem;
-  overflow-y: auto;
-}
-.card {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 560px;
-}
-.card h2 { font-size: 1.35rem; font-weight: 700; }
-/* h2 receives programmatic focus on each step change (see goStep) — it is
-   not keyboard-reachable, so suppressing the ring is safe. */
-.card h2:focus { outline: none; }
-.card p { color: var(--slate); margin-top: 0.6rem; line-height: 1.55; }
-.card p.hint { font-size: 0.85rem; color: var(--muted); }
-section[hidden] { display: none; }
-
-/* ── Buttons ──────────────────────────────────────────────────────────── */
-
-button {
-  font: inherit;
-  cursor: pointer;
-  border-radius: 9px;
-  border: 1px solid transparent;
-  padding: 0.7rem 1.25rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--faint);
+  text-align: center;
+  transition: color 0.2s ease;
 }
-button:disabled { opacity: 0.5; cursor: default; }
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--blue-dark); }
-.btn-primary.big { padding: 0.85rem 1.6rem; font-size: 1.05rem; }
-.btn-outline { background: #fff; color: var(--blue); border-color: #bfdbfe; }
-.btn-outline:hover:not(:disabled) { background: #eff6ff; }
-.btn-ghost { background: transparent; color: var(--slate); }
-.btn-ghost:hover:not(:disabled) { background: var(--bg); }
-.row { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+/* Connecting track — sits behind the dots, joining each dot to the previous */
+.stepper .step::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+  transition: background 0.25s ease;
+}
+.stepper .step:first-child::before { display: none; }
+/* A step that is active or done means the step before it is complete. */
+.stepper .step.active::before,
+.stepper .step.done::before { background: var(--accent); }
 
-/* ── Account bar ──────────────────────────────────────────────────────── */
+.stepper .step .dot {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--line);
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.78rem;
+  transition: background 0.2s ease, border-color 0.2s ease,
+              color 0.2s ease, box-shadow 0.2s ease;
+}
+.stepper .step.active { color: var(--ink); }
+.stepper .step.active .dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.stepper .step.done { color: var(--ink-2); }
+.stepper .step.done .dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: transparent;
+}
+/* Done steps swap their number for a check mark, drawn over the dot. */
+.stepper .step.done .dot::after {
+  content: "\2713";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.82rem;
+}
+
+/* ── Account bar ─────────────────────────────────────────────────────────*/
 
 .account-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0 2rem 0.4rem;
+  padding: 0 2rem 0.5rem;
   font-size: 0.8rem;
   color: var(--muted);
 }
+#account-who {
+  display: inline-flex;
+  align-items: center;
+}
+#account-who::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+  margin-right: 0.5rem;
+}
+
+/* ── Main / card ─────────────────────────────────────────────────────────*/
+
+main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.5rem 2rem 2.2rem;
+  overflow-y: auto;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 2.2rem 2.25rem;
+  width: 100%;
+  max-width: 560px;
+  animation: card-rise 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+/* h2 receives programmatic focus on each step change (see goStep) — it is
+   not keyboard-reachable, so suppressing the ring is safe. */
+.card h2:focus { outline: none; }
+.card p {
+  color: var(--ink-2);
+  margin-top: 0.65rem;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+.card p strong { color: var(--ink); font-weight: 600; }
+.card p.hint { font-size: 0.85rem; color: var(--muted); }
+section[hidden] { display: none; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────*/
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--r-ctrl);
+  border: 1px solid transparent;
+  padding: 0.66rem 1.2rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: background 0.15s ease, border-color 0.15s ease,
+              box-shadow 0.15s ease, transform 0.05s ease;
+}
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4px var(--accent);
+}
+button:not(:disabled):active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-btn);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:active:not(:disabled) { background: var(--accent-press); }
+.btn-primary.big {
+  padding: 0.85rem 1.7rem;
+  font-size: 1rem;
+  border-radius: 12px;
+}
+
+.btn-outline {
+  background: #fff;
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.btn-outline:hover:not(:disabled) { background: var(--accent-soft); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--line-2); color: var(--ink-2); }
+
 .btn-link {
   background: none;
   border: none;
   padding: 0;
   font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--blue);
-  text-decoration: underline;
+  font-size: 0.84rem;
+  color: var(--accent);
 }
-.btn-link:hover { color: var(--blue-dark); }
+.btn-link:hover { color: var(--accent-hover); text-decoration: underline; }
+.btn-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-radius: 4px;
+}
 
-.waiting { margin-top: 1rem; color: var(--slate); font-size: 0.9rem; }
+.row {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 1.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
 
-/* ── File chosen ──────────────────────────────────────────────────────── */
+/* ── Waiting / spinner ───────────────────────────────────────────────────*/
+
+.waiting {
+  margin-top: 1.1rem;
+  display: flex;
+  align-items: center;
+  color: var(--ink-2);
+  font-size: 0.92rem;
+}
+.signin-wait { margin-top: 1.4rem; }
+.signin-wait .hint { margin-top: 0.5rem; }
+
+.spinner {
+  display: inline-block;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+  margin-right: 0.55rem;
+  flex: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── File chosen chip ────────────────────────────────────────────────────*/
 
 .file-chosen {
-  margin-top: 1.25rem;
-  display: flex; align-items: center; gap: 0.6rem;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
-  border-radius: 9px;
-  padding: 0.8rem 1rem;
-  font-size: 0.95rem;
+  margin-top: 1.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--green-soft);
+  border: 1px solid var(--green-border);
+  color: var(--green-ink);
+  border-radius: var(--r-ctrl);
+  padding: 0.85rem 1rem;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+.file-check {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
-/* ── Section picker ───────────────────────────────────────────────────── */
+/* ── Section picker ──────────────────────────────────────────────────────*/
 
 /* Capped so the step-3 card (heading + list + new-section + buttons) fits
    the window without pushing "Start import" off the bottom edge — including
    when the "create a new section" form is expanded. */
-.notebooks { margin-top: 1.1rem; max-height: 210px; overflow-y: auto; }
-.notebook { margin-bottom: 0.4rem; }
+.notebooks { margin-top: 1.2rem; max-height: 210px; overflow-y: auto; padding-right: 0.15rem; }
+.notebook { margin-bottom: 0.45rem; }
+.notebook:last-child { margin-bottom: 0; }
+
 .nb-name {
   width: 100%;
-  display: flex; align-items: center; gap: 0.55rem;
-  padding: 0.6rem 0.8rem;
-  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.66rem 0.8rem;
+  background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  font-weight: 700; font-size: 0.92rem;
-  color: var(--ink); text-align: left;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--ink);
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-.nb-name:hover:not(:disabled) { background: #f1f5f9; }
+.nb-name:hover:not(:disabled) { background: var(--line-2); }
 .nb-name:disabled { opacity: 0.55; }
-.nb-name.expanded { border-color: #bfdbfe; }
-.nb-caret { width: 0.85rem; color: var(--muted); font-size: 0.7rem; }
-.nb-label { flex: 1; }
-.nb-count { color: var(--muted); font-weight: 600; font-size: 0.75rem; }
-.nb-sections { padding: 0.35rem 0 0.5rem 0.6rem; }
-.section-opt {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin: 0.3rem 0;
-  cursor: pointer;
+.nb-name.expanded {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
 }
-.section-opt:hover { background: var(--bg); }
-.section-opt.selected { border-color: var(--blue); background: #eff6ff; }
-.section-opt input { accent-color: var(--blue); }
+.nb-caret {
+  width: 0.85rem;
+  color: var(--faint);
+  font-size: 0.7rem;
+  flex: none;
+}
+.nb-label { flex: 1; }
+.nb-count {
+  flex: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.7rem;
+  background: var(--line-2);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+}
+.nb-name.expanded .nb-count { background: #fff; }
+.nb-sections { padding: 0.4rem 0 0.5rem 0.65rem; }
 
-/* ── New section ──────────────────────────────────────────────────────── */
+.section-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.58rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  margin: 0.32rem 0;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.section-opt:hover { background: var(--line-2); }
+.section-opt.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.section-opt input { accent-color: var(--accent); flex: none; }
 
-.new-section { margin-top: 0.85rem; }
+/* ── New section ─────────────────────────────────────────────────────────*/
+
+.new-section { margin-top: 0.95rem; }
 .new-section-form {
   display: flex;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin-top: 0.65rem;
   flex-wrap: wrap;
 }
 .new-section-form select,
 .new-section-form input {
   font: inherit;
-  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   background: #fff;
   color: var(--ink);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.new-section-form select:focus,
+.new-section-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .new-section-form select { max-width: 44%; }
 .new-section-form input { flex: 1; min-width: 8rem; }
+.new-section-form input::placeholder { color: var(--faint); }
 #new-section-msg { margin-top: 0.5rem; font-size: 0.85rem; color: var(--amber); }
 
-/* ── Progress ─────────────────────────────────────────────────────────── */
+/* ── Progress ────────────────────────────────────────────────────────────*/
 
 .progressbar {
-  margin-top: 1.5rem;
+  margin-top: 1.6rem;
   height: 12px;
   background: var(--line);
   border-radius: 999px;
@@ -215,42 +475,61 @@ button:disabled { opacity: 0.5; cursor: default; }
 .progressbar > .fill {
   height: 100%;
   width: 0%;
-  background: var(--blue);
-  transition: width 0.25s ease;
-}
-.progress-line { margin-top: 0.8rem; font-weight: 600; }
-.progress-note { margin-top: 0.3rem; color: var(--slate); font-size: 0.9rem;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.counts { margin-top: 0.6rem; font-size: 0.9rem; color: var(--slate); }
-
-/* ── Done ─────────────────────────────────────────────────────────────── */
-
-.result-big { font-size: 2rem; font-weight: 800; margin-top: 0.5rem; }
-.result-line { margin-top: 0.75rem; font-size: 1rem; }
-.tally-ok { color: var(--green); font-weight: 700; }
-.tally-skip { color: var(--amber); font-weight: 700; }
-.tally-fail { color: var(--red); font-weight: 700; }
-
-.spinner {
-  display: inline-block;
-  width: 1rem; height: 1rem;
-  border: 2px solid var(--line);
-  border-top-color: var(--blue);
+  background: var(--bar-grad);
   border-radius: 999px;
-  animation: spin 0.7s linear infinite;
-  vertical-align: -2px;
-  margin-right: 0.4rem;
+  transition: width 0.3s ease;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.progress-line {
+  margin-top: 0.95rem;
+  font-weight: 700;
+  font-size: 1rem;
+}
+.progress-note {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.counts {
+  margin-top: 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+/* ── Done ────────────────────────────────────────────────────────────────*/
+
+.result-big {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 0.7rem;
+}
+.result-line { margin-top: 0.7rem; font-size: 1rem; color: var(--ink-2); }
+.tally-ok   { color: var(--green); font-weight: 800; }
+.tally-skip { color: var(--amber); font-weight: 800; }
+.tally-fail { color: var(--red);   font-weight: 800; }
+
+/* ── Error box ───────────────────────────────────────────────────────────*/
 
 .error-box {
-  margin-top: 1rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: 9px;
-  padding: 0.8rem 1rem;
+  margin-top: 1.1rem;
+  background: var(--red-soft);
+  border: 1px solid var(--red-border);
+  color: var(--red-ink);
+  border-radius: var(--r-ctrl);
+  padding: 0.85rem 1rem;
   font-size: 0.9rem;
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre-line;
+}
+
+/* ── Motion preference ───────────────────────────────────────────────────*/
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
