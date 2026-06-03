@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { importNotes } = require('../src/import-core.js');
+const importCore = require('../src/import-core.js');
 
 function fakeClient() {
   let pageSeq = 0;
@@ -64,4 +65,11 @@ test('targetSection routes every note to the pre-chosen section, no createSectio
   });
   assert.strictEqual(counts.succeeded, 1);
   assert.strictEqual(createSectionCalls, 0);
+});
+
+test('yearFromCreated returns null for non-numeric or short prefixes (fidelity)', () => {
+  assert.strictEqual(importCore.yearFromCreated('20240115T101500Z'), '2024');
+  assert.strictEqual(importCore.yearFromCreated('bad-date'), null);
+  assert.strictEqual(importCore.yearFromCreated(''), null);
+  assert.strictEqual(importCore.yearFromCreated(null), null);
 });

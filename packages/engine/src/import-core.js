@@ -17,7 +17,8 @@ function prepareResources(rawResources) {
 
 function yearFromCreated(created) {
   if (!created || created.length < 4) return null;
-  return created.slice(0, 4);
+  const y = created.slice(0, 4);
+  return /^\d{4}$/.test(y) ? y : null;
 }
 
 /**
