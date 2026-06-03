@@ -56,6 +56,7 @@ async function importNotes(o) {
     yearSections = false, tagsStrategy = 'page-metadata', onConflict = null,
     askConflict = null, concurrency = 1, globalBackoff = null, preserveMetadata = true,
     onEvent = () => {},
+    shouldCancel = () => false,
     isImported = progressLib.isImported,
     verifyImport = progressLib.verifyImport,
     markImported = progressLib.markImported,
@@ -63,6 +64,7 @@ async function importNotes(o) {
   } = o;
 
   const counts = { succeeded: 0, failed: 0, skipped: 0 };
+  let cancelled = false;
   const sectionCache = new Map();
   const sectionCreating = new Map();
   const sectionGroupCache = new Map();
@@ -87,6 +89,10 @@ async function importNotes(o) {
     const title = note.title || 'Untitled Note';
     const key = noteKeyFn(filename, note);
     const ctx = { filename, index: i, total: notes.length, title };
+    if (cancelled || shouldCancel()) {
+      if (!cancelled) { cancelled = true; onEvent({ type: 'cancelled', ...ctx }); }
+      return;
+    }
     try {
       if (resume && !forceReimport && isImported(progress, filename, key)) {
         if (dryRun) { onEvent({ type: 'noteSkipped', reason: 'dry-run', ...ctx }); counts.skipped++; return; }
@@ -163,7 +169,7 @@ async function importNotes(o) {
     }
   });
 
-  return counts;
+  return { ...counts, cancelled };
 }
 
 module.exports = { importNotes, prepareResources, yearFromCreated };

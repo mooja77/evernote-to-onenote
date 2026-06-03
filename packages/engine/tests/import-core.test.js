@@ -73,3 +73,40 @@ test('yearFromCreated returns null for non-numeric or short prefixes (fidelity)'
   assert.strictEqual(importCore.yearFromCreated(''), null);
   assert.strictEqual(importCore.yearFromCreated(null), null);
 });
+
+test('shouldCancel stops importing remaining notes and returns cancelled=true', async () => {
+  const events = [];
+  let seen = 0;
+  const counts = await importNotes({
+    notes: [
+      { title: 'A', content: '<en-note/>', resources: [] },
+      { title: 'B', content: '<en-note/>', resources: [] },
+      { title: 'C', content: '<en-note/>', resources: [] },
+    ],
+    filename: 'Book.enex',
+    client: fakeClient(),
+    notebook: { id: null },
+    progress: { version: 2, files: {} },
+    targetSection: { id: 'sec-1' },
+    noteKeyFn,
+    concurrency: 1,
+    saveProgress: () => {},
+    shouldCancel: () => seen >= 1,   // cancel after the first note has been processed
+    onEvent: (e) => { events.push(e.type); if (e.type === 'noteImported') seen++; },
+  });
+  assert.strictEqual(counts.cancelled, true);
+  assert.strictEqual(counts.succeeded, 1);          // only the first imported
+  assert.ok(events.includes('cancelled'));
+  assert.ok(events.filter((t) => t === 'cancelled').length === 1, 'cancelled emitted exactly once');
+});
+
+test('no shouldCancel → cancelled is false and all import', async () => {
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }, { title: 'B', content: '<en-note/>', resources: [] }],
+    filename: 'Book.enex', client: fakeClient(), notebook: { id: null },
+    progress: { version: 2, files: {} }, targetSection: { id: 'sec-1' }, noteKeyFn,
+    concurrency: 1, saveProgress: () => {}, onEvent: () => {},
+  });
+  assert.strictEqual(counts.cancelled, false);
+  assert.strictEqual(counts.succeeded, 2);
+});
