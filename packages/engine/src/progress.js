@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 
-const PROGRESS_FILE = path.resolve('progress.json');
+const PROGRESS_FILE = process.env.E2O_PROGRESS_FILE ? path.resolve(process.env.E2O_PROGRESS_FILE) : path.resolve('progress.json');
 const GRAPH_PAGES_BASE = 'https://graph.microsoft.com/v1.0/me/onenote/pages';
 // v1.3.0 added inProgressUploads as an optional field; schema version
 // stays at 2 because the field is purely additive — v1.2.4 readers
@@ -245,6 +245,7 @@ async function verifyImport(progress, filename, noteKey, client) {
 
 module.exports = {
   PROGRESS_FILE,
+  PROGRESS_FILE_FOR_TEST: PROGRESS_FILE,
   PROGRESS_SCHEMA_VERSION,
   loadProgress,
   saveProgress,
