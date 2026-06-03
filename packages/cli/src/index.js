@@ -5,15 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const readline = require('readline');
-const { parseEnexFile } = require('./enex-parser');
-const { enmlToHtml, enmlToHtmlWithResources, toOneNoteHtml } = require('./enml-converter');
-const { OneNoteClient } = require('./onenote-client');
-const { getAuthenticatedToken, runAuthFlow, getTokenFromFile } = require('./auth');
-const { loadProgress, saveProgress, markImported, isImported, verifyImport } = require('./progress');
-const { applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES } = require('./tags');
-const { createGlobalBackoff, createWriteQueue, runParallel } = require('./parallel');
-const { ProgressBar, describeError, interactiveSetup } = require('./ui');
 const {
+  parseEnexFile, enmlToHtml, enmlToHtmlWithResources, toOneNoteHtml,
+  OneNoteClient, loadProgress, saveProgress, markImported, isImported, verifyImport,
+  applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES,
+  createGlobalBackoff, createWriteQueue, runParallel,
   LOCAL_FILENAME_SLOT,
   LOCAL_NOTEBOOK_NAME,
   discoverCacheFile,
@@ -21,7 +17,9 @@ const {
   detectSchema,
   iterateNotes: iterateLocalNotes,
   summarizeCache,
-} = require('./local-cache-reader');
+} = require('evernote-onenote-engine');
+const { getAuthenticatedToken, runAuthFlow, getTokenFromFile } = require('./auth-cli');
+const { ProgressBar, describeError, interactiveSetup } = require('./ui');
 const { version } = require('../package.json');
 
 const FLAGS_WITH_VALUES = ['--batch', '--output-html', '--tags-strategy', '--on-conflict', '--concurrency', '--notebooks', '--date-range', '--report', '--cache-path'];

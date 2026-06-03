@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PublicClientApplication } = require('@azure/msal-node');
+const { createTokenProvider } = require('evernote-onenote-engine');
 
 const CACHE_FILE = path.resolve(__dirname, '..', 'msal-cache.json');
 const TOKEN_FILE = path.resolve(__dirname, '..', '.access-token');
@@ -72,38 +73,13 @@ function buildCachePlugin() {
 }
 
 async function getAuthenticatedToken({ noInteractive = false } = {}) {
-  const app = buildMsalApp();
-  const accounts = await app.getTokenCache().getAllAccounts();
-
-  if (accounts.length > 0) {
-    try {
-      const result = await app.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] });
-      return result.accessToken;
-    } catch (err) {
-      const isInvalidGrant =
-        err.name === 'InteractionRequiredAuthError' ||
-        err.errorCode === 'invalid_grant' ||
-        err.error === 'invalid_grant' ||
-        (typeof err.message === 'string' && err.message.includes('invalid_grant'));
-
-      if (isInvalidGrant) {
-        if (process.env.NODE_ENV !== 'test') {
-          console.warn('  ⚠ Your saved login has expired. You will be asked to sign in again.');
-        }
-        try { fs.unlinkSync(CACHE_FILE); } catch { /* already gone */ }
-      }
-      // Other silent failures fall through to device-code below
-    }
-  }
-
-  if (noInteractive) {
-    throw new Error(
-      'Authentication required but no interactive terminal available. ' +
-      'Run: evernote-to-onenote --auth  (then retry this command)'
-    );
-  }
-
-  return runAuthFlow();
+  const getToken = createTokenProvider({
+    buildApp: buildMsalApp,
+    scopes: SCOPES,
+    noInteractive: noInteractive || process.env.MSAL_NO_INTERACTIVE === '1',
+    acquireInteractive: async () => runAuthFlow(),
+  });
+  return getToken();
 }
 
 async function runAuthFlow() {

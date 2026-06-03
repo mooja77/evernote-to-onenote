@@ -15,7 +15,7 @@ const os = require('os');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-const { iterateNotes, openReadOnly } = require('../src/local-cache-reader');
+const { iterateNotes, openReadOnly } = require('evernote-onenote-engine');
 
 const CLI = path.join(__dirname, '..', 'src', 'index.js');
 

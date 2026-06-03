@@ -24,7 +24,7 @@ const {
   iterateNotes,
   openReadOnly,
   scrubLocalResourceRefs,
-} = require('../src/local-cache-reader');
+} = require('evernote-onenote-engine');
 
 const CLI = path.join(__dirname, '..', 'src', 'index.js');
 

@@ -11,7 +11,7 @@ const os = require('os');
 const fs = require('fs');
 
 const CLI = path.join(__dirname, '..', 'src', 'index.js');
-const fix = (name) => path.join(__dirname, 'fixtures', name);
+const fix = (name) => path.join(__dirname, '..', '..', 'engine', 'tests', 'fixtures', name);
 
 function makeTempDir(label) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `enex-cli-${label}-`));

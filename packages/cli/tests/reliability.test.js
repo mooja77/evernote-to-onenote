@@ -24,7 +24,7 @@ const origFetchEntry = require.cache[fetchCachePath];
 require.cache[fetchCachePath] = {
   id: fetchCachePath, filename: fetchCachePath, loaded: true, exports: fetchProxy,
 };
-const { OneNoteClient } = require('../src/onenote-client');
+const { OneNoteClient } = require('evernote-onenote-engine');
 require.cache[fetchCachePath] = origFetchEntry;
 
 function makeResponse(status, body = {}, headers = {}) {
@@ -68,12 +68,12 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     require.cache[msalCachePath] = {
       id: msalCachePath, filename: msalCachePath, loaded: true, exports: fake,
     };
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
   }
 
   function restoreMsal(origEntry) {
     require.cache[msalCachePath] = origEntry;
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
   }
 
   test('InteractionRequiredAuthError falls back to device-code', async () => {
@@ -83,7 +83,7 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     });
     installFakeMsal(buildFakeMsal({ silentError, deviceToken: 'recovered-token' }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'recovered-token');
     } finally {
@@ -99,7 +99,7 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     });
     installFakeMsal(buildFakeMsal({ silentError, deviceToken: 'refreshed-token' }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'refreshed-token');
     } finally {
@@ -115,7 +115,7 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     });
     installFakeMsal(buildFakeMsal({ silentError, deviceToken: 'token-via-error-field' }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'token-via-error-field');
     } finally {
@@ -129,7 +129,7 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     silentError.name = 'TokenError';
     installFakeMsal(buildFakeMsal({ silentError, deviceToken: 'message-matched-token' }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'message-matched-token');
     } finally {
@@ -144,10 +144,10 @@ describe('auth — invalid_grant triggers device-code re-auth', () => {
     });
     installFakeMsal(buildFakeMsal({ silentError }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       await assert.rejects(
         () => auth.getAuthenticatedToken({ noInteractive: true }),
-        /evernote-to-onenote --auth/
+        /[Aa]uthentication required/
       );
     } finally {
       restoreMsal(origEntry);
@@ -198,13 +198,13 @@ describe('enex-parser — per-note error isolation', () => {
         },
       },
     };
-    delete require.cache[require.resolve('../src/enex-parser')];
+    delete require.cache[require.resolve('evernote-onenote-engine/src/enex-parser')];
     return orig;
   }
 
   function restoreXml2js(orig) {
     require.cache[xml2jsCachePath] = orig;
-    delete require.cache[require.resolve('../src/enex-parser')];
+    delete require.cache[require.resolve('evernote-onenote-engine/src/enex-parser')];
   }
 
   test('valid notes before/after corrupt note are returned', async () => {
@@ -228,7 +228,7 @@ describe('enex-parser — per-note error isolation', () => {
     fs.writeFileSync(tmp, '<en-export></en-export>');
 
     try {
-      const { parseEnexFile } = require('../src/enex-parser');
+      const { parseEnexFile } = require('evernote-onenote-engine/src/enex-parser');
       const notes = await parseEnexFile(tmp);
 
       assert.equal(notes.length, 2, 'two valid notes should be returned');
@@ -259,7 +259,7 @@ describe('enex-parser — per-note error isolation', () => {
     fs.writeFileSync(tmp, '<en-export></en-export>');
 
     try {
-      const { parseEnexFile } = require('../src/enex-parser');
+      const { parseEnexFile } = require('evernote-onenote-engine/src/enex-parser');
       const notes = await parseEnexFile(tmp);
       assert.equal(notes.length, 0);
     } finally {
@@ -278,7 +278,7 @@ describe('enex-parser — per-note error isolation', () => {
     fs.writeFileSync(tmp, '<en-export></en-export>');
 
     try {
-      const { parseEnexFile } = require('../src/enex-parser');
+      const { parseEnexFile } = require('evernote-onenote-engine/src/enex-parser');
       const notes = await parseEnexFile(tmp);
       assert.equal(notes.length, 2);
       assert.equal(notes[0].title, 'Note 1');
