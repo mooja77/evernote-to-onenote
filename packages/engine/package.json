@@ -6,7 +6,14 @@
   "engines": { "node": ">=20" },
   "main": "src/index.js",
   "files": ["src/", "LICENSE"],
-  "scripts": { "test": "node ../../scripts/run-tests.mjs" },
+  "keywords": ["evernote","onenote","enex","microsoft-graph","import","engine"],
+  "repository": { "type": "git", "url": "git+https://github.com/mooja77/evernote-to-onenote.git" },
+  "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
+  "bugs": { "url": "https://github.com/mooja77/evernote-to-onenote/issues" },
+  "scripts": {
+    "test": "node ../../scripts/run-tests.mjs",
+    "prepublishOnly": "npm test"
+  },
   "dependencies": {
     "@azure/msal-node": "^5.1.2",
     "better-sqlite3": "^12.9.0",
