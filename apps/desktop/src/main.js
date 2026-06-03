@@ -15,10 +15,9 @@ try { fs.mkdirSync(userDataDir, { recursive: true }); } catch { /* exists */ }
 process.env.E2O_MSAL_CACHE = path.join(userDataDir, 'msal-cache.json');
 process.env.E2O_PROGRESS_FILE = path.join(userDataDir, 'progress.json');
 
-const auth = require('./lib/auth');
-const { OneNoteClient } = require('./lib/onenote-client');
+const auth = require('./auth-desktop');
+const { OneNoteClient, runParallel, createGlobalBackoff } = require('evernote-onenote-engine');
 const { runImport } = require('./import-runner');
-const { runParallel, createGlobalBackoff } = require('./lib/parallel');
 
 let mainWindow = null;
 let importCancelRequested = false;
