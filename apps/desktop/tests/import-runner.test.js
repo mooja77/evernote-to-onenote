@@ -25,7 +25,7 @@ function fakeClient() {
   };
 }
 
-const SAMPLE_ENEX = path.join(__dirname, '..', '..', '..', 'test.enex');
+const SAMPLE_ENEX = path.join(__dirname, 'fixtures', 'sample.enex');
 
 test.beforeEach(() => { try { fs.unlinkSync(TMP_PROGRESS); } catch { /* none */ } });
 test.after(() => { try { fs.unlinkSync(TMP_PROGRESS); } catch { /* none */ } });
