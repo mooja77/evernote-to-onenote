@@ -1,5 +1,115 @@
 # Evernote → OneNote Importer — Architecture Specification
 
+---
+
+## Monorepo Architecture (v3, 2026)
+
+This section documents the npm-workspaces monorepo layout introduced in v1.4+. The original single-package module contracts in sections 1–9 below remain accurate; source files have moved under `packages/engine/src/` (engine modules) or `packages/cli/src/` (CLI modules) — the logical contracts are unchanged.
+
+### Repository Layout
+
+```
+evernote-to-onenote/
+├── packages/
+│   ├── engine/          evernote-onenote-engine  (shared, publishable)
+│   └── cli/             evernote-to-onenote      (npm CLI, v1.4.x)
+└── apps/
+    └── desktop/         evernote-to-onenote-desktop  (private Electron app)
+```
+
+**`packages/engine`** (`evernote-onenote-engine`) — the shared, I/O-free core:
+- ENEX parsing, ENML→HTML conversion
+- OneNote Graph API client (retry, backoff, pagination)
+- Resumable progress ledger (`progress.js`)
+- Concurrency runner (`parallel.js`)
+- Tags handling (`tags.js`)
+- Local Evernote SQLite cache reader (`from-local.js`)
+- `auth-core` — auth-agnostic token provider (`createTokenProvider`)
+- `import-core` — event-emitting import loop (`importNotes`)
+
+**`packages/cli`** (`evernote-to-onenote`) — the npm CLI package:
+- Device-code auth flow (`auth-cli`)
+- Terminal UI / progress rendering
+- CLI flag parsing (`--batch`, `--resume`, `--year-sections`, `--output-html`, etc.)
+- Routes import through `import-core` with a terminal event reporter
+- `--output-html` mode (CLI-only; no Graph API calls)
+
+**`apps/desktop`** (`evernote-to-onenote-desktop`) — the Electron app:
+- Browser-PKCE auth flow (`auth-desktop`)
+- Electron main / preload / renderer
+- `import-runner` delegates to `import-core` for a single fixed OneNote section
+
+**BOUNDARY RULE:** The engine (`packages/engine`) never performs terminal output, browser interaction, or Electron I/O. It emits events via `onEvent` and exposes pure functions. Front-ends own rendering, auth interaction, and path configuration.
+
+---
+
+### import-core Event Contract
+
+`import-core.importNotes(opts)` runs the import loop. All events are delivered via `opts.onEvent(event)`.
+
+**Common fields** on every event: `{ type, filename, index, total, title }`
+- `filename` — the source `.enex` filename
+- `index` — 0-based note index within the current file
+- `total` — total notes in the current file
+- `title` — note title (defaulting to `'Untitled Note'`)
+
+**Return value:** `{ succeeded, failed, skipped, cancelled }`
+
+**Event table:**
+
+| `type` | Additional fields | When emitted |
+|---|---|---|
+| `noteStart` | _(none)_ | Import of this note is beginning (after skip checks pass) |
+| `noteImported` | `pageId`, `tags`, `dryRun` | Note successfully imported (or written in dry-run mode) |
+| `noteSkipped` | `reason` | Note skipped; `reason` ∈ `dry-run` \| `verified` \| `verify-inconclusive` \| `conflict` |
+| `noteRetry` | `reason: 'page-missing'` | Ledger records note as imported but the page is gone; re-importing |
+| `conflict` | `action: 'rename' \| 'overwrite'`, `from?`, `to?` | Existing page conflict resolved; `rename` includes `from`/`to` titles |
+| `sectionOverflow` | `newName` | Section full (Graph error 30102/507); overflow section created with `newName` |
+| `warning` | `message` | Non-fatal issue (e.g. page-delete failed during overwrite) |
+| `error` | `message`, `error` | Note import failed; `error` is the thrown Error object |
+| `cancelled` | _(none)_ | Emitted once when `shouldCancel()` returns true; remaining notes are skipped |
+
+**`noteSkipped` reason semantics:**
+- `dry-run` — `--dry-run` mode; no API call was made
+- `verified` — `--resume` mode; `verifyImport` confirmed the page still exists in OneNote
+- `verify-inconclusive` — `--resume` mode; verify returned `unknown` (network/rate-limit); note is conservatively skipped
+- `conflict` — `onConflict: 'skip'` and an existing page was found with the same title
+
+---
+
+### Auth Boundary
+
+`auth-core.createTokenProvider({ buildApp, scopes, acquireInteractive, noInteractive })` owns:
+- Silent MSAL token acquisition (reads `E2O_MSAL_CACHE` or `./msal-cache.json`)
+- Transparent silent refresh on token expiry
+- Cache persistence after each acquisition
+
+Each front-end injects:
+- **`buildApp`** — constructs the MSAL PublicClientApplication with front-end–specific authority and client ID
+- **`acquireInteractive`** — the interactive fallback flow:
+  - CLI (`auth-cli`): device-code flow (prints URL to terminal)
+  - Desktop (`auth-desktop`): browser-PKCE flow (opens Electron browser window)
+- **`noInteractive`** — whether to throw instead of prompting (e.g. mid-import or headless CI)
+
+Environment variables relocate state without code changes:
+- `E2O_MSAL_CACHE` — override MSAL cache path (desktop sets this to Electron `userData`)
+- `E2O_PROGRESS_FILE` — override progress ledger path (desktop sets this to `userData`)
+
+---
+
+### Backward-Compatibility: `noteKeyFn` and Ledger Keys
+
+`importNotes` accepts a `noteKeyFn(filename, note) => string` parameter so each front-end preserves its historic progress.json key format:
+
+| Front-end | Key format |
+|---|---|
+| CLI | `${filename}::${title}::${created}` |
+| Desktop | `${sectionId}::${filename}::${title}::${created}` |
+
+This injection means existing `progress.json` files keep resolving correctly under `--resume` after upgrading to the monorepo layout. Neither front-end's ledger is invalidated by the refactor.
+
+---
+
 **Version:** 2 (MSAL + v2 progress + multipart attachments)
 **Author:** Architect (supervisor agent, 2026-04-19)
 **Audience:** Coders A / B / C (file-ownership matrix below)

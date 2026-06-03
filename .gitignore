@@ -42,6 +42,9 @@ run-integration-tests.js
 /*.enex
 !tests/fixtures/*.enex
 
+# Private Evernote export folders.
+JM Notes/
+
 # Generated local test/export folders.
 test-batch/
 test-batch-integration/

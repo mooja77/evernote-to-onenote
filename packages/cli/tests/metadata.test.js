@@ -7,7 +7,7 @@
  */
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { toOneNoteHtml, formatEnexDate } = require('../src/enml-converter');
+const { toOneNoteHtml, formatEnexDate } = require('evernote-onenote-engine');
 const {
   matchNotebookPattern,
   parseDateRange,

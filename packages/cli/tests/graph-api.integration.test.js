@@ -22,13 +22,13 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 
-const { OneNoteClient } = require('../src/onenote-client');
-const { parseEnexFile } = require('../src/enex-parser');
-const { enmlToHtml, toOneNoteHtml } = require('../src/enml-converter');
-const { loadProgress, saveProgress, markImported, isImported } = require('../src/progress');
-const { getAuthenticatedToken, getTokenFromFile } = require('../src/auth');
+const {
+  OneNoteClient, parseEnexFile, enmlToHtml, toOneNoteHtml,
+  loadProgress, saveProgress, markImported, isImported,
+} = require('evernote-onenote-engine');
+const { getAuthenticatedToken, getTokenFromFile } = require('../src/auth-cli');
 
-const FIXTURE = path.resolve(__dirname, 'fixtures', 'single-note.enex');
+const FIXTURE = path.resolve(__dirname, '..', '..', 'engine', 'tests', 'fixtures', 'single-note.enex');
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0/me/onenote';
 
 // ─── Auth check ─────────────────────────────────────────────────────────────
@@ -314,7 +314,7 @@ describe('Graph API integration — live (skip if no auth)', () => {
     // version picks up the mocked fetch rather than the already-bound original.
     let callCount = 0;
     const fetchCachePath2 = require.resolve('node-fetch');
-    const clientCachePath = require.resolve('../src/onenote-client');
+    const clientCachePath = require.resolve('evernote-onenote-engine/src/onenote-client');
     const origFetchEntry = require.cache[fetchCachePath2];
     const origClientEntry = require.cache[clientCachePath];
     require.cache[fetchCachePath2] = {
@@ -341,7 +341,7 @@ describe('Graph API integration — live (skip if no auth)', () => {
 
     let result;
     try {
-      const { OneNoteClient: MockableClient } = require('../src/onenote-client');
+      const { OneNoteClient: MockableClient } = require('evernote-onenote-engine/src/onenote-client');
       const mockClient = new MockableClient({ accessToken: 'mock-tok', dryRun: false });
       result = await mockClient.listNotebooks();
     } finally {

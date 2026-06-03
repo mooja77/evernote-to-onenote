@@ -13,7 +13,7 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 
-const fix = (name) => path.join(__dirname, 'fixtures', name);
+const fix = (name) => path.join(__dirname, '..', '..', 'engine', 'tests', 'fixtures', name);
 const CLI = path.join(__dirname, '..', 'src', 'index.js');
 
 // ── Shared fetch proxy (onenote-client reliability tests) ─────────────────────
@@ -27,7 +27,7 @@ const origFetchEntry = require.cache[fetchCachePath];
 require.cache[fetchCachePath] = {
   id: fetchCachePath, filename: fetchCachePath, loaded: true, exports: fetchProxy,
 };
-const { OneNoteClient } = require('../src/onenote-client');
+const { OneNoteClient } = require('evernote-onenote-engine');
 require.cache[fetchCachePath] = origFetchEntry;
 
 function makeResp(status, body = {}, headers = {}) {
@@ -94,13 +94,13 @@ describe('Reliability — token expiry recovery (additional paths)', () => {
     require.cache[msalCachePath] = {
       id: msalCachePath, filename: msalCachePath, loaded: true, exports: fake,
     };
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
     return orig;
   }
 
   function restoreMsal(orig) {
     require.cache[msalCachePath] = orig;
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
   }
 
   test('token expiry clears cache file and re-authenticates', async () => {
@@ -113,7 +113,7 @@ describe('Reliability — token expiry recovery (additional paths)', () => {
     });
     const orig = installFakeMsal(buildFakeMsal({ silentError, deviceToken: 'fresh-token' }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'fresh-token');
     } finally {
@@ -128,7 +128,7 @@ describe('Reliability — token expiry recovery (additional paths)', () => {
     });
     const orig = installFakeMsal(buildFakeMsal({ silentError }));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       await assert.rejects(
         () => auth.getAuthenticatedToken({ noInteractive: true }),
         /--auth/
@@ -413,7 +413,7 @@ describe('interactiveSetup — mocked readline', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('enex-parser — title edge cases', () => {
-  const { parseEnexFile } = require('../src/enex-parser');
+  const { parseEnexFile } = require('evernote-onenote-engine');
 
   test('note with no title element returns empty string title', async () => {
     const notes = await parseEnexFile(fix('no-title.enex'));
@@ -488,7 +488,7 @@ describe('enex-parser — title edge cases', () => {
 });
 
 describe('enex-parser — empty and zero-note files', () => {
-  const { parseEnexFile } = require('../src/enex-parser');
+  const { parseEnexFile } = require('evernote-onenote-engine');
 
   test('completely empty file throws (invalid XML)', async () => {
     await withTmpEnex('', async (tmp) => {
@@ -521,7 +521,7 @@ describe('enex-parser — empty and zero-note files', () => {
 });
 
 describe('enex-parser — resource edge cases', () => {
-  const { parseEnexFile } = require('../src/enex-parser');
+  const { parseEnexFile } = require('evernote-onenote-engine');
 
   test('resource with missing mime defaults to empty string', async () => {
     const notes = await parseEnexFile(fix('missing-resource-data.enex'));

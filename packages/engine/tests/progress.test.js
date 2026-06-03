@@ -285,3 +285,13 @@ describe('progress module', () => {
     assert.equal(result, 'unknown');
   });
 });
+
+test('PROGRESS_FILE honours E2O_PROGRESS_FILE override', () => {
+  const prev = process.env.E2O_PROGRESS_FILE;
+  process.env.E2O_PROGRESS_FILE = path.join('/tmp', 'custom-progress.json');
+  delete require.cache[require.resolve('../src/progress.js')];
+  const fresh = require('../src/progress.js');
+  assert.strictEqual(fresh.PROGRESS_FILE_FOR_TEST, path.resolve('/tmp', 'custom-progress.json'));
+  if (prev === undefined) delete process.env.E2O_PROGRESS_FILE; else process.env.E2O_PROGRESS_FILE = prev;
+  delete require.cache[require.resolve('../src/progress.js')];
+});

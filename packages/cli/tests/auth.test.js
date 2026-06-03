@@ -10,7 +10,7 @@ const CACHE_FILE = path.resolve(__dirname, '..', 'msal-cache.json');
 
 describe('auth module', () => {
   it('exports required functions', () => {
-    const auth = require('../src/auth');
+    const auth = require('../src/auth-cli');
     assert.equal(typeof auth.getAuthenticatedToken, 'function');
     assert.equal(typeof auth.runAuthFlow, 'function');
     assert.equal(typeof auth.getTokenFromFile, 'function');
@@ -18,7 +18,7 @@ describe('auth module', () => {
   });
 
   it('TOKEN_FILE points to project root', () => {
-    const auth = require('../src/auth');
+    const auth = require('../src/auth-cli');
     assert.ok(auth.TOKEN_FILE.endsWith('.access-token'));
     assert.ok(!auth.TOKEN_FILE.includes('src'));
   });
@@ -32,7 +32,7 @@ describe('auth module', () => {
     const backup = hadFile ? fs.readFileSync(TOKEN_FILE) : null;
     if (hadFile) fs.unlinkSync(TOKEN_FILE);
 
-    const auth = require('../src/auth');
+    const auth = require('../src/auth-cli');
     const result = auth.getTokenFromFile();
     assert.equal(result, null);
 
@@ -43,8 +43,8 @@ describe('auth module', () => {
   it('getTokenFromFile reads ONENOTE_ACCESS_TOKEN env var', () => {
     process.env.ONENOTE_ACCESS_TOKEN = 'test-token-123';
     // clear require cache so we get fresh module
-    delete require.cache[require.resolve('../src/auth')];
-    const auth = require('../src/auth');
+    delete require.cache[require.resolve('../src/auth-cli')];
+    const auth = require('../src/auth-cli');
     const result = auth.getTokenFromFile();
     assert.equal(result, 'test-token-123');
     delete process.env.ONENOTE_ACCESS_TOKEN;
@@ -53,8 +53,8 @@ describe('auth module', () => {
   it('getTokenFromFile reads from .access-token file', () => {
     delete process.env.ONENOTE_ACCESS_TOKEN;
     fs.writeFileSync(TOKEN_FILE, 'file-token-abc\n', 'utf8');
-    delete require.cache[require.resolve('../src/auth')];
-    const auth = require('../src/auth');
+    delete require.cache[require.resolve('../src/auth-cli')];
+    const auth = require('../src/auth-cli');
     const result = auth.getTokenFromFile();
     assert.equal(result, 'file-token-abc');
     fs.unlinkSync(TOKEN_FILE);
@@ -62,9 +62,9 @@ describe('auth module', () => {
 
   it('MSAL_CLIENT_ID env var overrides default client ID', () => {
     process.env.MSAL_CLIENT_ID = 'custom-client-id';
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
     // just check module loads without error — client ID is consumed at buildMsalApp() time
-    const auth = require('../src/auth');
+    const auth = require('../src/auth-cli');
     assert.equal(typeof auth.getAuthenticatedToken, 'function');
     delete process.env.MSAL_CLIENT_ID;
   });
@@ -112,12 +112,12 @@ describe('auth module — MSAL mocking', () => {
       id: msalCachePath, filename: msalCachePath, loaded: true,
       exports: fakeMsal,
     };
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
   }
 
   function restoreMsal() {
     if (origMsalEntry) require.cache[msalCachePath] = origMsalEntry;
-    delete require.cache[require.resolve('../src/auth')];
+    delete require.cache[require.resolve('../src/auth-cli')];
   }
 
   it('getAuthenticatedToken returns token via silent acquire when account cached', async () => {
@@ -127,7 +127,7 @@ describe('auth module — MSAL mocking', () => {
     });
     installFakeMsal(fakeMsal);
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'silent-access-token');
     } finally {
@@ -144,7 +144,7 @@ describe('auth module — MSAL mocking', () => {
     });
     installFakeMsal(fakeMsal);
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'device-code-token');
     } finally {
@@ -156,7 +156,7 @@ describe('auth module — MSAL mocking', () => {
     const fakeMsal = buildFakeMsal({ accounts: [], deviceToken: 'fresh-device-token' });
     installFakeMsal(fakeMsal);
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.getAuthenticatedToken();
       assert.equal(token, 'fresh-device-token');
     } finally {
@@ -172,7 +172,7 @@ describe('auth module — MSAL mocking', () => {
     const origLog = console.log;
     console.log = (...args) => messages.push(args.join(' '));
     try {
-      const auth = require('../src/auth');
+      const auth = require('../src/auth-cli');
       const token = await auth.runAuthFlow();
       assert.equal(token, 'run-auth-flow-tok');
       assert.ok(messages.some(m => m.includes('microsoft.com') || m.includes('devicelogin') || m.includes('TESTCODE')));
@@ -194,7 +194,7 @@ describe('auth module — MSAL mocking', () => {
     installFakeMsal(fakeMsal);
 
     // Verify the cache plugin was set up (presence indicates MSAL was given it)
-    const auth = require('../src/auth');
+    const auth = require('../src/auth-cli');
     await auth.getAuthenticatedToken();
     // If we got here without errors, MSAL was wired up correctly
     assert.equal(typeof auth.getAuthenticatedToken, 'function');

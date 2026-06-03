@@ -1,52 +1,17 @@
 {
-  "name": "evernote-to-onenote",
-  "version": "1.4.2",
-  "description": "Import Evernote .enex exports into Microsoft OneNote via the Graph API — resumable, scriptable, parallel",
+  "name": "evernote-to-onenote-monorepo",
+  "version": "0.0.0",
+  "private": true,
   "license": "MIT",
-  "engines": {
-    "node": ">=20"
-  },
-  "bin": {
-    "evernote-to-onenote": "src/index.js"
-  },
-  "files": [
-    "src/",
-    "LICENSE",
-    "README.md",
-    "SECURITY.md",
-    "PRIVACY.md"
+  "engines": { "node": ">=20" },
+  "workspaces": [
+    "packages/engine",
+    "packages/cli",
+    "apps/desktop"
   ],
-  "keywords": [
-    "evernote",
-    "onenote",
-    "migration",
-    "enex",
-    "microsoft-graph",
-    "notes",
-    "import",
-    "cli"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/mooja77/evernote-to-onenote.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mooja77/evernote-to-onenote/issues"
-  },
-  "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
   "scripts": {
-    "start": "node src/index.js",
-    "test": "node scripts/run-tests.mjs",
-    "test:unit": "node scripts/run-tests.mjs",
-    "pack:check": "node scripts/prepublish-check.mjs",
-    "prepublishOnly": "node scripts/prepublish-check.mjs && npm test"
-  },
-  "dependencies": {
-    "@azure/msal-node": "^5.1.2",
-    "better-sqlite3": "^12.9.0",
-    "form-data": "^4.0.5",
-    "node-fetch": "^2.7.0",
-    "open": "^11.0.0",
-    "xml2js": "^0.6.2"
+    "test": "npm test --workspaces --if-present",
+    "test:engine": "npm test -w evernote-onenote-engine",
+    "test:cli": "npm test -w evernote-to-onenote"
   }
 }

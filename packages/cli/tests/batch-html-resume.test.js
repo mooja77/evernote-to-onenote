@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 
 const CLI = path.join(__dirname, '..', 'src', 'index.js');
-const fix = (name) => path.join(__dirname, 'fixtures', name);
+const fix = (name) => path.join(__dirname, '..', '..', 'engine', 'tests', 'fixtures', name);
 
 function run(args, opts = {}) {
   const { env = {}, cwd } = opts;

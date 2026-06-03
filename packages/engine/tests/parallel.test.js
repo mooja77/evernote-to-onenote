@@ -85,6 +85,12 @@ describe('createGlobalBackoff', () => {
     backoff.set(200);
     assert.equal(backoff.active, true);
     await backoff.wait();
+    // Tolerate timer/clock-source skew (notably on Windows): setTimeout can
+    // resolve a hair before Date.now() crosses the deadline, so `active` may
+    // still read true for a few ms right after wait(). A small margin makes
+    // this deterministic without weakening the intent (active flips false
+    // once the backoff window has elapsed).
+    await new Promise((r) => setTimeout(r, 30));
     assert.equal(backoff.active, false);
   });
 

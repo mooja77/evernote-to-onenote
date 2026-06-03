@@ -5,15 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const readline = require('readline');
-const { parseEnexFile } = require('./enex-parser');
-const { enmlToHtml, enmlToHtmlWithResources, toOneNoteHtml } = require('./enml-converter');
-const { OneNoteClient } = require('./onenote-client');
-const { getAuthenticatedToken, runAuthFlow, getTokenFromFile } = require('./auth');
-const { loadProgress, saveProgress, markImported, isImported, verifyImport } = require('./progress');
-const { applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES } = require('./tags');
-const { createGlobalBackoff, createWriteQueue, runParallel } = require('./parallel');
-const { ProgressBar, describeError, interactiveSetup } = require('./ui');
 const {
+  parseEnexFile, enmlToHtml, enmlToHtmlWithResources, toOneNoteHtml,
+  OneNoteClient, loadProgress, saveProgress, markImported, isImported, verifyImport,
+  applyTagsToHtml, resolveSectionForTags, VALID_STRATEGIES,
+  createGlobalBackoff, createWriteQueue, runParallel,
   LOCAL_FILENAME_SLOT,
   LOCAL_NOTEBOOK_NAME,
   discoverCacheFile,
@@ -21,7 +17,10 @@ const {
   detectSchema,
   iterateNotes: iterateLocalNotes,
   summarizeCache,
-} = require('./local-cache-reader');
+  importNotes: importNotesCore,
+} = require('evernote-onenote-engine');
+const { getAuthenticatedToken, runAuthFlow, getTokenFromFile } = require('./auth-cli');
+const { ProgressBar, describeError, interactiveSetup } = require('./ui');
 const { version } = require('../package.json');
 
 const FLAGS_WITH_VALUES = ['--batch', '--output-html', '--tags-strategy', '--on-conflict', '--concurrency', '--notebooks', '--date-range', '--report', '--cache-path'];
@@ -194,6 +193,68 @@ function noteKey(filename, note) {
   return `${filename}::${note.title || 'Untitled'}::${note.created || ''}`;
 }
 
+// Historic CLI ledger key — MUST stay byte-identical to the pre-monorepo format
+// so existing users' progress.json files keep resolving under --resume.
+function cliNoteKey(filename, note) {
+  return `${filename}::${note.title || 'Untitled'}::${note.created || ''}`;
+}
+
+// Maps engine import-core events → the original terminal strings so that
+// stdout-asserting CLI tests keep passing after the delegation refactor.
+function makeCliReporter({ fileIndex, fileCount, quiet, bar, tagsStrategy }) {
+  return (e) => {
+    const label = `[file ${fileIndex}/${fileCount}: ${e.filename}] [note ${e.index + 1}/${e.total}]`;
+    const title = e.title;
+    if (e.type === 'noteStart') {
+      if (!quiet) process.stdout.write(`  → ${label} "${title}"\n`);
+    } else if (e.type === 'noteRetry') {
+      process.stdout.write(`  ⚠ ${label} "${title}" (page missing in OneNote — re-importing)\n`);
+    } else if (e.type === 'noteSkipped') {
+      if (e.reason === 'dry-run') {
+        if (!quiet) process.stdout.write(`  ↷ ${label} "${title}" (skipped)\n`);
+      } else if (e.reason === 'verified') {
+        if (!quiet) process.stdout.write(`  ↷ ${label} "${title}" (skipped — verified)\n`);
+      } else if (e.reason === 'verify-inconclusive') {
+        if (!quiet) process.stdout.write(`  ? ${label} "${title}" (verify inconclusive — skipping, try again later)\n`);
+      } else if (e.reason === 'conflict') {
+        if (!quiet) process.stdout.write(`  ⊝ ${label} "${title}" (conflict — page already exists, skipping)\n`);
+      }
+      bar?.tick();
+    } else if (e.type === 'noteImported') {
+      if (!e.dryRun && !quiet) console.log(`    ✓ Imported`);
+      if (!quiet && e.tags && e.tags.length > 0) {
+        const tagLabel = tagsStrategy === 'section-groups' ? `Tags (section-groups): ` : `Tags: `;
+        console.log(`    ${tagLabel}${e.tags.join(', ')}`);
+      }
+      bar?.tick();
+    } else if (e.type === 'sectionOverflow') {
+      console.log(`    ⚠ Section full — creating "${e.newName}"`);
+    } else if (e.type === 'conflict') {
+      if (e.action === 'rename') {
+        if (!quiet) process.stdout.write(`  ↷ ${label} "${e.from}" → renamed to "${e.to}"\n`);
+      } else if (e.action === 'overwrite') {
+        console.warn(`    ⚠ Overwriting existing page (consumer tier may 503 on delete)`);
+      }
+    } else if (e.type === 'warning') {
+      // Engine emits warnings for delete failures and overwrite delete-fails.
+      // Replicate the exact original format: "    ⚠ Delete failed (...) — creating duplicate instead"
+      // The engine wraps the delete-fail message as: "delete failed: <msg>"
+      // Original warn: `    ⚠ Delete failed (${deleteErr.message}) — creating duplicate instead`
+      const msg = e.message || '';
+      if (msg.startsWith('delete failed: ')) {
+        console.warn(`    ⚠ Delete failed (${msg.slice('delete failed: '.length)}) — creating duplicate instead`);
+      } else {
+        console.warn(`    ⚠ ${msg}`);
+      }
+    } else if (e.type === 'error') {
+      console.error(`    ✗ Failed: ${e.message}`);
+      const hint = describeError(e.error);
+      if (hint) console.error(hint);
+      bar?.tick();
+    }
+  };
+}
+
 function yearFromCreated(created) {
   if (!created || created.length < 4) return null;
   const y = created.slice(0, 4);
@@ -273,82 +334,36 @@ async function importNotes({
   concurrency = 1, globalBackoff, enqueueWrite, preserveMetadata = true,
   quiet = false, bar = null,
 }) {
-  const counts = { succeeded: 0, failed: 0, skipped: 0 };
   const doSave = enqueueWrite
     ? () => enqueueWrite(() => saveProgress(progress))
     : () => saveProgress(progress);
 
-  // sectionName → { section, baseName, overflowCount }
-  const sectionCache = new Map();
-  // sectionName → Promise — deduplicates concurrent createSection calls for the same name
-  const sectionCreating = new Map();
-  // tag name → { group, section } — used only by 'section-groups' strategy
-  const sectionGroupCache = new Map();
+  // ── outputHtmlDir path: CLI-only, unchanged ──────────────────────────────
+  if (outputHtmlDir) {
+    const counts = { succeeded: 0, failed: 0, skipped: 0 };
+    const backoff = globalBackoff || { wait: async () => {}, active: false, set: () => {} };
 
-  async function getSection(sectionName) {
-    if (sectionCache.has(sectionName)) return sectionCache.get(sectionName);
-    if (!sectionCreating.has(sectionName)) {
-      const p = client.createSection(notebook.id, sectionName).then(section => {
-        const entry = { section, baseName: sectionName, overflowCount: 0 };
-        sectionCache.set(sectionName, entry);
-        return entry;
-      });
-      sectionCreating.set(sectionName, p);
-    }
-    return sectionCreating.get(sectionName);
-  }
+    await runParallel(notes, concurrency, backoff, async (note, i) => {
+      const title = note.title || 'Untitled Note';
+      const key = noteKey(filename, note);
+      const label = `[file ${fileIndex}/${fileCount}: ${filename}] [note ${i + 1}/${notes.length}]`;
 
-  // 'ask' mode is stdin-driven and cannot run in parallel
-  const effectiveConcurrency = onConflict === 'ask' ? 1 : concurrency;
-  const backoff = globalBackoff || { wait: async () => {}, active: false, set: () => {} };
+      try {
+        if (!quiet) process.stdout.write(`  → ${label} "${title}"\n`);
 
-  await runParallel(notes, effectiveConcurrency, backoff, async (note, i) => {
-    const title = note.title || 'Untitled Note';
-    const key = noteKey(filename, note);
-    const label = `[file ${fileIndex}/${fileCount}: ${filename}] [note ${i + 1}/${notes.length}]`;
-
-    try {
-      if (resume && !forceReimport && isImported(progress, filename, key)) {
-        if (dryRun) {
-          if (!quiet) process.stdout.write(`  ↷ ${label} "${title}" (skipped)\n`);
-          counts.skipped++;
-          return;
+        const resources = prepareResources(note.resources || []);
+        let html, usedResources;
+        if (resources.length > 0) {
+          ({ html, usedResources } = enmlToHtmlWithResources(note.content, resources));
+        } else {
+          html = enmlToHtml(note.content);
+          usedResources = [];
         }
-        const state = await verifyImport(progress, filename, key, client);
-        if (state === 'exists') {
-          if (!quiet) process.stdout.write(`  ↷ ${label} "${title}" (skipped — verified)\n`);
-          counts.skipped++;
-          return;
+
+        if (tagsStrategy === 'page-metadata' && note.tags && note.tags.length > 0) {
+          html = applyTagsToHtml(html, note.tags);
         }
-        if (state === 'unknown') {
-          // Auth/network/5xx — we don't actually know if the page is gone.
-          // Prior behaviour treated this as "missing" and triple-posted
-          // through a cascading auth failure. Skip, let the next pass try.
-          if (!quiet) process.stdout.write(`  ? ${label} "${title}" (verify inconclusive — skipping, try again later)\n`);
-          counts.skipped++;
-          return;
-        }
-        // state === 'missing' — confirmed 404, safe to re-import.
-        process.stdout.write(`  ⚠ ${label} "${title}" (page missing in OneNote — re-importing)\n`);
-      }
 
-      if (!quiet) process.stdout.write(`  → ${label} "${title}"\n`);
-
-      const resources = prepareResources(note.resources || []);
-      let html, usedResources;
-      if (resources.length > 0) {
-        ({ html, usedResources } = enmlToHtmlWithResources(note.content, resources));
-      } else {
-        html = enmlToHtml(note.content);
-        usedResources = [];
-      }
-
-      // Apply tags to HTML body (page-metadata strategy)
-      if (tagsStrategy === 'page-metadata' && note.tags && note.tags.length > 0) {
-        html = applyTagsToHtml(html, note.tags);
-      }
-
-      if (outputHtmlDir) {
         const notebookDir = path.join(outputHtmlDir, sanitizeName(filename.replace(/\.enex$/i, '')));
         if (!fs.existsSync(notebookDir)) fs.mkdirSync(notebookDir, { recursive: true });
         let safeName = sanitizeName(title);
@@ -389,113 +404,43 @@ async function importNotes({
         markImported(progress, filename, key, null);
         doSave();
         counts.succeeded++;
-        return;
+      } catch (err) {
+        const hint = describeError(err);
+        console.error(`    ✗ Failed: ${err.message}`);
+        if (hint) console.error(hint);
+        counts.failed++;
+      } finally {
+        bar?.tick();
       }
+    });
 
-      // Resolve section: 'section-groups' routes by primary tag; default uses year/notebook name.
-      let sectionRef;
-      if (tagsStrategy === 'section-groups' && note.tags && note.tags.length > 0) {
-        const tagSection = await resolveSectionForTags(note.tags, notebook.id, client, sectionGroupCache);
-        if (tagSection) {
-          sectionRef = { section: tagSection, baseName: note.tags[0], overflowCount: 0 };
-        }
-      }
+    return { succeeded: counts.succeeded, failed: counts.failed, skipped: counts.skipped };
+  }
 
-      if (!sectionRef) {
-        // Default section = the .enex filename (e.g. "AppSoftware"). With
-        // --year-sections, split further by created-year within that
-        // section. Fallback to "Imported" for hyper-unusual cases where
-        // defaultSectionName isn't set (standalone single-file runs).
-        const base = defaultSectionName || 'Imported';
-        const sectionName = yearSections
-          ? `${base} ${yearFromCreated(note.created) || ''}`.trim()
-          : base;
-        sectionRef = await getSection(sectionName);
-      }
-
-      // Conflict detection: check if a page with the same title already exists
-      let effectiveTitle = title;
-      if (!dryRun && onConflict) {
-        const existing = await client.findPageByTitle(sectionRef.section.id, title);
-        if (existing) {
-          if (onConflict === 'skip') {
-            if (!quiet) process.stdout.write(`  ⊝ ${label} "${title}" (conflict — page already exists, skipping)\n`);
-            counts.skipped++;
-            return;
-          } else if (onConflict === 'rename') {
-            const dateSuffix = new Date().toISOString().slice(0, 10);
-            effectiveTitle = `${title} (imported ${dateSuffix})`;
-            if (!quiet) process.stdout.write(`  ↷ ${label} "${title}" → renamed to "${effectiveTitle}"\n`);
-          } else if (onConflict === 'overwrite') {
-            console.warn(`    ⚠ Overwriting existing page (consumer tier may 503 on delete)`);
-            try {
-              await client.deletePage(existing.id);
-            } catch (deleteErr) {
-              console.warn(`    ⚠ Delete failed (${deleteErr.message}) — creating duplicate instead`);
-            }
-          } else if (onConflict === 'ask') {
-            const choice = await askConflict(title);
-            if (choice === 'skip') {
-              if (!quiet) process.stdout.write(`  ⊝ ${label} "${title}" (conflict — skipped by user)\n`);
-              counts.skipped++;
-              return;
-            } else if (choice === 'rename') {
-              const dateSuffix = new Date().toISOString().slice(0, 10);
-              effectiveTitle = `${title} (imported ${dateSuffix})`;
-            } else if (choice === 'overwrite') {
-              console.warn(`    ⚠ Overwriting existing page (consumer tier may 503 on delete)`);
-              try {
-                await client.deletePage(existing.id);
-              } catch (deleteErr) {
-                console.warn(`    ⚠ Delete failed (${deleteErr.message}) — creating duplicate instead`);
-              }
-            }
-          }
-        }
-      }
-
-      const meta = preserveMetadata ? { created: note.created, author: note.author, sourceUrl: note.sourceUrl } : null;
-      const page = toOneNoteHtml(effectiveTitle, html, meta);
-
-      let pageId;
-      try {
-        const created = usedResources.length > 0
-          ? await client.createPageWithAttachments(sectionRef.section.id, effectiveTitle, page, usedResources)
-          : await client.createPage(sectionRef.section.id, effectiveTitle, page);
-        pageId = created && created.id;
-      } catch (apiErr) {
-        if (apiErr.message.includes('30102') || apiErr.message.includes('507')) {
-          sectionRef.overflowCount++;
-          const newName = `${sectionRef.baseName} (${sectionRef.overflowCount})`;
-          console.log(`    ⚠ Section full — creating "${newName}"`);
-          const newSection = await client.createSection(notebook.id, newName);
-          sectionRef.section = newSection;
-          const created = usedResources.length > 0
-            ? await client.createPageWithAttachments(sectionRef.section.id, effectiveTitle, page, usedResources)
-            : await client.createPage(sectionRef.section.id, effectiveTitle, page);
-          pageId = created && created.id;
-        } else {
-          throw apiErr;
-        }
-      }
-
-      if (!dryRun && !quiet) console.log(`    ✓ Imported`);
-      if (!quiet && note.tags && note.tags.length > 0) {
-        const tagLabel = tagsStrategy === 'section-groups' ? `Tags (section-groups): ` : `Tags: `;
-        console.log(`    ${tagLabel}${note.tags.join(', ')}`);
-      }
-
-      markImported(progress, filename, key, pageId || null);
-      doSave();
-      counts.succeeded++;
-    } catch (err) {
-      const hint = describeError(err);
-      console.error(`    ✗ Failed: ${err.message}`);
-      if (hint) console.error(hint);
-      counts.failed++;
-    } finally {
-      bar?.tick();
-    }
+  // ── OneNote import path: delegate to engine import-core ──────────────────
+  const counts = await importNotesCore({
+    notes,
+    filename,
+    client,
+    notebook,
+    progress,
+    noteKeyFn: cliNoteKey,
+    defaultSectionName,
+    dryRun,
+    resume,
+    forceReimport,
+    yearSections,
+    tagsStrategy,
+    onConflict,
+    askConflict,
+    concurrency,
+    globalBackoff,
+    preserveMetadata,
+    isImported,
+    verifyImport,
+    markImported,
+    saveProgress: () => doSave(),
+    onEvent: makeCliReporter({ fileIndex, fileCount, quiet, bar, tagsStrategy }),
   });
 
   return { succeeded: counts.succeeded, failed: counts.failed, skipped: counts.skipped };
