@@ -73,11 +73,19 @@ function buildCachePlugin() {
 }
 
 async function getAuthenticatedToken({ noInteractive = false } = {}) {
+  const ni = noInteractive || process.env.MSAL_NO_INTERACTIVE === '1';
   const getToken = createTokenProvider({
     buildApp: buildMsalApp,
     scopes: SCOPES,
-    noInteractive: noInteractive || process.env.MSAL_NO_INTERACTIVE === '1',
-    acquireInteractive: async () => runAuthFlow(),
+    acquireInteractive: async () => {
+      if (ni) {
+        throw new Error(
+          'Authentication required but no interactive terminal available. ' +
+          'Run: evernote-to-onenote --auth  (then retry this command)'
+        );
+      }
+      return runAuthFlow();
+    },
   });
   return getToken();
 }

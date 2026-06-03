@@ -131,7 +131,7 @@ describe('Reliability — token expiry recovery (additional paths)', () => {
       const auth = require('../src/auth-cli');
       await assert.rejects(
         () => auth.getAuthenticatedToken({ noInteractive: true }),
-        /[Aa]uthentication required/
+        /--auth/
       );
     } finally {
       restoreMsal(orig);
