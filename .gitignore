@@ -56,3 +56,6 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
+
+# Playwright MCP page snapshots/screenshots (may capture secrets in DOM)
+.playwright-mcp/
