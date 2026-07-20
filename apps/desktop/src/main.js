@@ -5,6 +5,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 
 // The engine reads these env vars at require-time to decide where to keep the
@@ -22,6 +23,12 @@ const { runImport } = require('./import-runner');
 let mainWindow = null;
 let importCancelRequested = false;
 let importing = false;
+
+function assertTrustedRenderer(event) {
+  const expected = pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+  const actual = event.senderFrame && event.senderFrame.url;
+  if (actual !== expected) throw new Error('Rejected IPC request from an untrusted renderer.');
+}
 
 // A bearer-token provider for the OneNote client + import runner. Silent only
 // (the user has already signed in by the time this is used); MSAL refreshes
@@ -42,10 +49,12 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
   mainWindow.removeMenu();
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   // Guard against closing the window mid-import.
   mainWindow.on('close', (e) => {
@@ -156,15 +165,31 @@ ipcMain.handle('onenote:notebooks', async () => {
 
 // Create a new section in a notebook — so a user whose notebook has no
 // sections (or who simply wants a fresh one) is not stuck.
-ipcMain.handle('onenote:createSection', async (_e, { notebookId, name }) => {
+ipcMain.handle('onenote:createSection', async (event, args = {}) => {
+  assertTrustedRenderer(event);
+  const { notebookId, name } = args;
+  if (typeof notebookId !== 'string' || !notebookId.trim()) throw new Error('A valid notebook is required.');
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 50) {
+    throw new Error('Section name must be between 1 and 50 characters.');
+  }
   const client = new OneNoteClient({ getToken });
-  const sec = await client.createSection(notebookId, name);
-  return { id: sec.id, name: sec.displayName || name };
+  const cleanName = name.trim();
+  const sec = await client.createSection(notebookId, cleanName);
+  return { id: sec.id, name: sec.displayName || cleanName };
 });
 
 // ── IPC: the import ──────────────────────────────────────────────────────
 
-ipcMain.handle('import:start', async (_e, { enexPath, sectionId, force }) => {
+ipcMain.handle('import:start', async (event, args = {}) => {
+  assertTrustedRenderer(event);
+  const { enexPath, sectionId, force } = args;
+  if (importing) return { ok: false, error: 'An import is already running.' };
+  if (typeof enexPath !== 'string' || path.extname(enexPath).toLowerCase() !== '.enex' || !fs.existsSync(enexPath)) {
+    return { ok: false, error: 'Choose a valid Evernote .enex export file.' };
+  }
+  if (typeof sectionId !== 'string' || !sectionId.trim()) {
+    return { ok: false, error: 'Choose a valid OneNote section.' };
+  }
   importCancelRequested = false;
   importing = true;
   try {

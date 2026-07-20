@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PublicClientApplication } = require('@azure/msal-node');
+const { safeStorage } = require('electron');
 
 // Desktop build: the Electron main process sets E2O_MSAL_CACHE to a path
 // under app.getPath('userData'). Falls back to the package dir otherwise.
@@ -45,7 +46,7 @@ function detectClientId() {
   if (process.env.MSAL_CLIENT_ID) return process.env.MSAL_CLIENT_ID;
   if (!fs.existsSync(CACHE_FILE)) return DEFAULT_CLIENT_ID;
   try {
-    const cache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    const cache = JSON.parse(readCache());
     const clients = new Set([
       ...Object.values(cache.RefreshToken || {}).map(t => t.client_id),
       ...Object.values(cache.AccessToken || {}).map(t => t.client_id),
@@ -53,6 +54,34 @@ function detectClientId() {
     if (clients.size === 1) return [...clients][0];
   } catch { /* malformed cache — fall through */ }
   return DEFAULT_CLIENT_ID;
+}
+
+function readCache() {
+  const raw = fs.readFileSync(CACHE_FILE, 'utf8');
+  try {
+    const envelope = JSON.parse(raw);
+    if (envelope && envelope.encrypted === true && typeof envelope.data === 'string') {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure credential storage is unavailable.');
+      return safeStorage.decryptString(Buffer.from(envelope.data, 'base64'));
+    }
+  } catch (err) {
+    if (/Secure credential storage/.test(err.message)) throw err;
+    // A legacy cache is the raw MSAL JSON and is returned below.
+  }
+  return raw;
+}
+
+function writeCache(serialized) {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('Secure credential storage is unavailable; the sign-in session was not saved.');
+  }
+  const envelope = JSON.stringify({
+    encrypted: true,
+    data: safeStorage.encryptString(serialized).toString('base64'),
+  });
+  const tmp = CACHE_FILE + '.tmp';
+  fs.writeFileSync(tmp, envelope, { encoding: 'utf8', mode: 0o600 });
+  fs.renameSync(tmp, CACHE_FILE);
 }
 
 function buildMsalApp() {
@@ -73,7 +102,7 @@ function buildCachePlugin() {
     beforeCacheAccess: async (cacheContext) => {
       if (fs.existsSync(CACHE_FILE)) {
         try {
-          cacheContext.tokenCache.deserialize(fs.readFileSync(CACHE_FILE, 'utf8'));
+          cacheContext.tokenCache.deserialize(readCache());
         } catch {
           // Corrupted or unreadable cache — MSAL will start fresh and re-authenticate
         }
@@ -81,12 +110,11 @@ function buildCachePlugin() {
     },
     afterCacheAccess: async (cacheContext) => {
       if (cacheContext.cacheHasChanged) {
-        const tmp = CACHE_FILE + '.tmp';
         try {
-          fs.writeFileSync(tmp, cacheContext.tokenCache.serialize(), 'utf8');
-          fs.renameSync(tmp, CACHE_FILE);
+          writeCache(cacheContext.tokenCache.serialize());
         } catch (err) {
           console.warn(`[auth] Failed to persist token cache: ${err.message}`);
+          const tmp = CACHE_FILE + '.tmp';
           try { fs.unlinkSync(tmp); } catch { /* ignore */ }
         }
       }

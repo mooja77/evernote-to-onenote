@@ -4,6 +4,7 @@
  */
 const xml2js = require('xml2js');
 const fs = require('fs');
+const os = require('os');
 
 // 500MB cap — raised from 100MB so To Do List.enex (228MB, 862 notes)
 // parses. xml2js can handle hundreds of megabytes on modern hardware;
@@ -20,6 +21,20 @@ async function parseEnexFile(filePath) {
 
   const result = await parser.parseStringPromise(xml);
   const enExport = result['en-export'];
+  if (!enExport || typeof enExport !== 'object') {
+    throw new Error('Not a valid Evernote export: expected an <en-export> root element.');
+  }
+  // xml2js holds both the UTF-8 source and a JS object tree. Refuse a parse
+  // that is likely to exhaust currently available memory instead of letting
+  // the desktop process freeze or be terminated by the OS.
+  const estimatedPeakBytes = stat.size * 6;
+  const reserveBytes = 256 * 1024 * 1024;
+  if (estimatedPeakBytes + reserveBytes > os.freemem()) {
+    throw new Error(
+      `Not enough free memory to safely parse this ENEX file (${(stat.size / 1024 / 1024).toFixed(0)}MB). ` +
+      'Close other applications, split the Evernote export into smaller files, and try again.'
+    );
+  }
 
   // Handle single note or array of notes
   let notes = enExport.note;

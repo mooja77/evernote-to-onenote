@@ -100,4 +100,13 @@ describe('parseEnexFile', () => {
     await assert.rejects(() => parseEnexFile(tmp));
     fs.unlinkSync(tmp);
   });
+
+  test('throws a clear error when XML is not an Evernote export', async () => {
+    const fs = require('fs');
+    const os = require('os');
+    const tmp = path.join(os.tmpdir(), `wrong-root-${process.pid}.enex`);
+    fs.writeFileSync(tmp, '<document><note/></document>');
+    await assert.rejects(() => parseEnexFile(tmp), /Not a valid Evernote export/);
+    fs.unlinkSync(tmp);
+  });
 });

@@ -61,7 +61,7 @@ function buildCachePlugin() {
       if (cacheContext.cacheHasChanged) {
         const tmp = CACHE_FILE + '.tmp';
         try {
-          fs.writeFileSync(tmp, cacheContext.tokenCache.serialize(), 'utf8');
+          fs.writeFileSync(tmp, cacheContext.tokenCache.serialize(), { encoding: 'utf8', mode: 0o600 });
           fs.renameSync(tmp, CACHE_FILE);
         } catch (err) {
           console.warn(`[auth] Failed to persist token cache: ${err.message}`);
