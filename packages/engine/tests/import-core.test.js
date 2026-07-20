@@ -110,3 +110,65 @@ test('no shouldCancel → cancelled is false and all import', async () => {
   assert.strictEqual(counts.cancelled, false);
   assert.strictEqual(counts.succeeded, 2);
 });
+
+test('overwrite creates replacement before deleting the original', async () => {
+  const order = [];
+  const client = fakeClient();
+  client.findPageByTitle = async () => ({ id: 'old-page' });
+  client.createPage = async () => { order.push('create'); return { id: 'new-page' }; };
+  client.deletePage = async () => { order.push('delete'); };
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }],
+    filename: 'Book.enex', client, notebook: { id: 'nb1' },
+    progress: { version: 2, files: {} }, defaultSectionName: 'Book',
+    noteKeyFn, onConflict: 'overwrite', saveProgress: () => {}, onEvent: () => {},
+  });
+  assert.strictEqual(counts.succeeded, 1);
+  assert.deepStrictEqual(order, ['create', 'delete']);
+});
+
+test('overwrite preserves the original when replacement creation fails', async () => {
+  let deleted = false;
+  const client = fakeClient();
+  client.findPageByTitle = async () => ({ id: 'old-page' });
+  client.createPage = async () => { throw new Error('network unavailable'); };
+  client.deletePage = async () => { deleted = true; };
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }],
+    filename: 'Book.enex', client, notebook: { id: 'nb1' },
+    progress: { version: 2, files: {} }, defaultSectionName: 'Book',
+    noteKeyFn, onConflict: 'overwrite', saveProgress: () => {}, onEvent: () => {},
+  });
+  assert.strictEqual(counts.failed, 1);
+  assert.strictEqual(deleted, false);
+});
+
+test('507 storage-full errors are propagated without creating overflow sections', async () => {
+  let sectionCalls = 0;
+  const client = fakeClient();
+  client.createPage = async () => { throw new Error('OneDrive storage full (507 Insufficient Storage)'); };
+  client.createSection = async () => { sectionCalls++; return { id: 'unexpected' }; };
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }],
+    filename: 'Book.enex', client, notebook: { id: null },
+    progress: { version: 2, files: {} }, targetSection: { id: 'chosen' },
+    noteKeyFn, saveProgress: () => {}, onEvent: () => {},
+  });
+  assert.strictEqual(counts.failed, 1);
+  assert.strictEqual(sectionCalls, 0);
+});
+
+test('dry-run stores no synthetic Graph page ID', async () => {
+  const progress = { version: 2, files: {} };
+  let saves = 0;
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }],
+    filename: 'Book.enex', client: fakeClient(), notebook: { id: 'nb1' },
+    progress, defaultSectionName: 'Book', noteKeyFn, dryRun: true,
+    saveProgress: () => { saves++; }, onEvent: () => {},
+  });
+  assert.strictEqual(counts.succeeded, 1);
+  const entry = progress.files['Book.enex'].imported['Book.enex::A::'];
+  assert.strictEqual(entry.onenote_page_id, null);
+  assert.strictEqual(saves, 1);
+});

@@ -126,6 +126,7 @@ async function importNotes(o) {
       }
 
       let effectiveTitle = title;
+      let pageToDeleteAfterCreate = null;
       if (!dryRun && onConflict) {
         const existing = await client.findPageByTitle(sectionRef.section.id, title);
         if (existing) {
@@ -133,7 +134,13 @@ async function importNotes(o) {
           if (onConflict === 'ask') action = await askConflict(title);
           if (action === 'skip') { onEvent({ type: 'noteSkipped', reason: 'conflict', ...ctx }); counts.skipped++; return; }
           if (action === 'rename') { effectiveTitle = `${title} (imported ${new Date().toISOString().slice(0, 10)})`; onEvent({ type: 'conflict', action: 'rename', from: title, to: effectiveTitle, ...ctx }); }
-          if (action === 'overwrite') { onEvent({ type: 'conflict', action: 'overwrite', ...ctx }); try { await client.deletePage(existing.id); } catch (e) { onEvent({ type: 'warning', message: `delete failed: ${e.message}`, ...ctx }); } }
+          // Never delete the user's existing page before its replacement has
+          // been created successfully. Graph permits duplicate page titles, so
+          // create first and remove the old page only after the POST succeeds.
+          if (action === 'overwrite') {
+            pageToDeleteAfterCreate = existing.id;
+            onEvent({ type: 'conflict', action: 'overwrite', ...ctx });
+          }
         }
       }
 
@@ -147,7 +154,7 @@ async function importNotes(o) {
           : await client.createPage(sectionRef.section.id, effectiveTitle, page);
         pageId = created && created.id;
       } catch (apiErr) {
-        if (apiErr.message.includes('30102') || apiErr.message.includes('507')) {
+        if (apiErr.message.includes('30102') && !targetSection && notebook && notebook.id) {
           sectionRef.overflowCount++;
           const newName = `${sectionRef.baseName} (${sectionRef.overflowCount})`;
           onEvent({ type: 'sectionOverflow', newName, ...ctx });
@@ -159,7 +166,21 @@ async function importNotes(o) {
         } else throw apiErr;
       }
 
-      markImported(progress, filename, key, pageId || null);
+      if (pageToDeleteAfterCreate && !dryRun) {
+        try {
+          await client.deletePage(pageToDeleteAfterCreate);
+        } catch (e) {
+          // The replacement exists, so retaining the original is the safe
+          // failure mode. Surface the duplicate for the user to resolve.
+          onEvent({ type: 'warning', message: `replacement created but original could not be deleted: ${e.message}`, ...ctx });
+        }
+      }
+
+      // Dry-run ledgers are an established CLI resume feature. Store no
+      // synthetic Graph page ID, so a later live --resume treats the entry as
+      // unverified and performs the real import instead of issuing a lookup
+      // for "dry-run-page-id".
+      markImported(progress, filename, key, dryRun ? null : (pageId || null));
       saveProgress(progress);
       onEvent({ type: 'noteImported', pageId: pageId || null, tags: note.tags || [], dryRun, ...ctx });
       counts.succeeded++;

@@ -1,14 +1,38 @@
 {
   "name": "evernote-to-onenote",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "Import Evernote .enex exports into Microsoft OneNote via the Graph API — resumable, scriptable, parallel",
   "license": "MIT",
-  "engines": { "node": ">=20" },
-  "bin": { "evernote-to-onenote": "src/index.js" },
-  "files": ["src/", "LICENSE", "README.md", "SECURITY.md", "PRIVACY.md"],
-  "keywords": ["evernote","onenote","migration","enex","microsoft-graph","notes","import","cli"],
-  "repository": { "type": "git", "url": "git+https://github.com/mooja77/evernote-to-onenote.git" },
-  "bugs": { "url": "https://github.com/mooja77/evernote-to-onenote/issues" },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "evernote-to-onenote": "src/index.js"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "PRIVACY.md"
+  ],
+  "keywords": [
+    "evernote",
+    "onenote",
+    "migration",
+    "enex",
+    "microsoft-graph",
+    "notes",
+    "import",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mooja77/evernote-to-onenote.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mooja77/evernote-to-onenote/issues"
+  },
   "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
   "scripts": {
     "start": "node src/index.js",

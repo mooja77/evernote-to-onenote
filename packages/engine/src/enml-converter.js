@@ -137,8 +137,11 @@ function toOneNoteHtml(title, htmlBody, metadata = null) {
       lines.push(`<p><em>Author: ${escapeHtml(metadata.author)}</em></p>`);
     }
     if (metadata.sourceUrl) {
-      const escapedUrl = escapeHtml(metadata.sourceUrl);
-      lines.push(`<p><em>Source: <a href="${escapedUrl}">${escapedUrl}</a></em></p>`);
+      const safeUrl = safeHttpUrl(metadata.sourceUrl);
+      if (safeUrl) {
+        const escapedUrl = escapeHtml(safeUrl);
+        lines.push(`<p><em>Source: <a href="${escapedUrl}">${escapedUrl}</a></em></p>`);
+      }
     }
     if (lines.length > 0) {
       metaBlock = `<div class="note-metadata">\n  ${lines.join('\n  ')}\n  </div>\n  `;
@@ -155,6 +158,15 @@ function toOneNoteHtml(title, htmlBody, metadata = null) {
   ${metaBlock}${htmlBody}
 </body>
 </html>`;
+}
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' || url.protocol === 'http:' ? String(value) : null;
+  } catch {
+    return null;
+  }
 }
 
 function formatEnexDate(enexDate) {

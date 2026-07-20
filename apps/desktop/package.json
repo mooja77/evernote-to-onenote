@@ -1,13 +1,16 @@
 {
   "name": "evernote-to-onenote-desktop",
   "productName": "Evernote to OneNote",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Desktop app that migrates an Evernote .enex export into Microsoft OneNote — for non-technical users.",
   "main": "src/main.js",
   "author": "John Moore",
   "license": "MIT",
   "private": true,
-  "repository": { "type": "git", "url": "https://github.com/mooja77/evernote-to-onenote.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mooja77/evernote-to-onenote.git"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
@@ -18,14 +21,25 @@
     "open": "^11.0.0"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.jmsdevlab.evernote-to-onenote",
     "productName": "Evernote to OneNote",
-    "files": ["src/**/*", "package.json"],
-    "win": { "target": "nsis", "icon": "build/icon.png" },
-    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true }
+    "npmRebuild": false,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

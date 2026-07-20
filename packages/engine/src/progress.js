@@ -71,7 +71,7 @@ function _migrateV1(v1) {
 
 function saveProgress(progress) {
   const tmp = PROGRESS_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(progress, null, 2), 'utf8');
+  fs.writeFileSync(tmp, JSON.stringify(progress, null, 2), { encoding: 'utf8', mode: 0o600 });
   fs.renameSync(tmp, PROGRESS_FILE);
 }
 

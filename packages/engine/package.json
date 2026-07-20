@@ -1,23 +1,40 @@
 {
   "name": "evernote-onenote-engine",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared engine for Evernote ENEX → OneNote import: parsing, ENML conversion, Graph client, resumable progress ledger.",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "main": "src/index.js",
-  "files": ["src/", "LICENSE"],
-  "keywords": ["evernote","onenote","enex","microsoft-graph","import","engine"],
-  "repository": { "type": "git", "url": "git+https://github.com/mooja77/evernote-to-onenote.git" },
+  "files": [
+    "src/",
+    "LICENSE"
+  ],
+  "keywords": [
+    "evernote",
+    "onenote",
+    "enex",
+    "microsoft-graph",
+    "import",
+    "engine"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mooja77/evernote-to-onenote.git"
+  },
   "homepage": "https://github.com/mooja77/evernote-to-onenote#readme",
-  "bugs": { "url": "https://github.com/mooja77/evernote-to-onenote/issues" },
+  "bugs": {
+    "url": "https://github.com/mooja77/evernote-to-onenote/issues"
+  },
   "scripts": {
     "test": "node ../../scripts/run-tests.mjs",
     "prepublishOnly": "npm test"
   },
   "dependencies": {
-    "@azure/msal-node": "^5.1.2",
-    "better-sqlite3": "^12.9.0",
-    "form-data": "^4.0.5",
+    "@azure/msal-node": "^5.4.1",
+    "better-sqlite3": "^12.11.1",
+    "form-data": "^4.0.6",
     "node-fetch": "^2.7.0",
     "xml2js": "^0.6.2"
   }

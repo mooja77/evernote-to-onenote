@@ -81,6 +81,12 @@ describe('toOneNoteHtml metadata', () => {
     assert.match(html, /Source:/);
   });
 
+  test('omits unsafe source URL schemes', () => {
+    const html = toOneNoteHtml('My Note', '<p>body</p>', { sourceUrl: 'javascript:alert(1)' });
+    assert.doesNotMatch(html, /javascript:/i);
+    assert.doesNotMatch(html, /Source:/);
+  });
+
   test('escapes HTML in author name', () => {
     const html = toOneNoteHtml('My Note', '<p>body</p>', { author: '<script>xss</script>' });
     assert.doesNotMatch(html, /<script>/);
