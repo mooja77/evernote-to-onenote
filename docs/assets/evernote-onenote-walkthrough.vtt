@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00.000 --> 00:05.000
+Start the guided setup, or use the CLI fast path.
+
+00:05.000 --> 00:10.000
+Export one notebook. Use the synthetic example for a safe practice run.
+
+00:10.000 --> 00:16.000
+Preview first. A dry run sends nothing to Microsoft.
+
+00:16.000 --> 00:22.000
+Import only after checking the report.
+
+00:22.000 --> 00:28.000
+If interrupted, resume. Then verify the pages in OneNote.

@@ -122,6 +122,26 @@ ipcMain.handle('app:openOneNote', async () => {
   await shell.openExternal('https://www.onenote.com/notebooks');
 });
 
+// External destinations are fixed here rather than accepting an arbitrary URL
+// from the renderer. This keeps the sandboxed help surface useful without
+// turning it into a general-purpose navigation bridge.
+const RESOURCE_URLS = Object.freeze({
+  help: 'https://github.com/mooja77/evernote-to-onenote/blob/main/docs/HELP.md',
+  cli: 'https://github.com/mooja77/evernote-to-onenote/tree/main/packages/cli#readme',
+  example: 'https://raw.githubusercontent.com/mooja77/evernote-to-onenote/main/examples/safe-example.enex',
+  support: 'https://github.com/mooja77/evernote-to-onenote/issues/new?template=bug_report.md',
+  feature: 'https://github.com/mooja77/evernote-to-onenote/issues/new?template=feature_request.md',
+  walkthrough: 'https://github.com/mooja77/evernote-to-onenote/blob/main/docs/WALKTHROUGH.md',
+});
+
+ipcMain.handle('app:openResource', async (event, key) => {
+  assertTrustedRenderer(event);
+  const url = RESOURCE_URLS[key];
+  if (!url) throw new Error('Unknown help destination.');
+  await shell.openExternal(url);
+  return { opened: true };
+});
+
 // ── IPC: file picker ─────────────────────────────────────────────────────
 
 ipcMain.handle('files:pickEnex', async () => {
