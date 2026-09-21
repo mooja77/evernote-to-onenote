@@ -28,6 +28,10 @@
       </span>
       <span class="brand-name">Evernote to OneNote</span>
     </div>
+    <div class="header-actions">
+      <button class="btn-link" id="btn-fast-path" type="button">CLI fast path</button>
+      <button class="btn-outline" id="btn-help" type="button">Help</button>
+    </div>
   </header>
 
   <nav class="stepper" id="stepper">
@@ -71,8 +75,10 @@
       <p>In Evernote, select your notebook and choose
          <strong>File &rarr; Export Notes</strong>, saving as an
          <strong>.enex</strong> file. Then pick that file here.</p>
+      <p class="hint">Trying it first? Download the small synthetic example. It contains no real notes or personal information.</p>
       <div class="row">
         <button class="btn-primary big" id="btn-pick">Choose .enex file</button>
+        <button class="btn-outline" id="btn-safe-example" type="button">Get safe example</button>
       </div>
       <div class="file-chosen" id="file-chosen" hidden>
         <span class="file-check" aria-hidden="true">&#10003;</span><span id="file-name"></span>
@@ -137,6 +143,52 @@
       </div>
     </section>
   </main>
+
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="help-head">
+      <div>
+        <h2 id="help-title">Help and recovery</h2>
+        <p>Search for what went wrong or what to do next.</p>
+      </div>
+      <button class="btn-ghost" id="btn-help-close" type="button" aria-label="Close help">Close</button>
+    </div>
+    <label class="help-search">Search help
+      <input id="help-search" type="search" placeholder="Try: sign in, resume, storage, privacy" />
+    </label>
+    <div id="help-results" class="help-results">
+      <article data-help="sign in personal microsoft work school browser">
+        <h3>Sign-in does not finish</h3>
+        <p>Cancel and try again. Use the Microsoft account that owns the target OneNote. The desktop app supports personal and work or school accounts.</p>
+      </article>
+      <article data-help="resume recover interrupted stopped duplicate progress">
+        <h3>Resume after an interruption</h3>
+        <p>Choose the same export and OneNote section again. Progress is saved after every note, and pages already verified in OneNote are skipped.</p>
+      </article>
+      <article data-help="storage onedrive 507 full">
+        <h3>OneDrive storage is full</h3>
+        <p>Free space in OneDrive, then retry the same import. Finished notes remain recorded.</p>
+      </article>
+      <article data-help="file export enex evernote example">
+        <h3>I do not have an .enex file</h3>
+        <p>In Evernote, select a notebook and use File → Export Notes. Choose ENEX. You can also download the safe synthetic example from step 2.</p>
+      </article>
+      <article data-help="privacy data graph microsoft telemetry attachments bug report">
+        <h3>Where does my data go?</h3>
+        <p>Your export is read locally. A live import sends converted notes only to Microsoft Graph for your OneNote. There is no analytics or hosted processing. Never post real exports, tokens, caches or private logs in a public issue.</p>
+      </article>
+      <article data-help="cli fast experienced batch dry run verify">
+        <h3>Experienced-user fast path</h3>
+        <p>Use the CLI for batch imports, dry-run reports and verification. Open the CLI guide below.</p>
+      </article>
+    </div>
+    <p id="help-empty" class="hint" hidden>No matching help. Open the full guide or ask for help.</p>
+    <div class="help-links">
+      <button class="btn-outline" data-resource="help" type="button">Full guide</button>
+      <button class="btn-outline" data-resource="walkthrough" type="button">Captioned walkthrough</button>
+      <button class="btn-outline" data-resource="support" type="button">Ask for help</button>
+      <button class="btn-outline" data-resource="feature" type="button">Request a feature</button>
+    </div>
+  </dialog>
 
   <script src="app.js"></script>
 </body>

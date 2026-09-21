@@ -72,6 +72,7 @@ header {
   padding: 1.6rem 2rem 0.4rem;
   display: flex;
   justify-content: center;
+  position: relative;
 }
 .brand {
   display: flex;
@@ -87,6 +88,54 @@ header {
   font-weight: 700;
   letter-spacing: -0.012em;
   color: var(--ink);
+}
+.header-actions {
+  position: absolute;
+  right: 1.5rem;
+  top: 1.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* ── Searchable help ─────────────────────────────────────────────────── */
+
+dialog {
+  width: min(640px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  margin: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+dialog::backdrop { background: rgba(15, 23, 42, 0.52); }
+.help-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.help-head p { margin-top: 0.35rem; color: var(--muted); }
+.help-search { display: block; margin-top: 1rem; color: var(--ink-2); font-weight: 600; }
+.help-search input {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font: inherit;
+}
+.help-search input:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+.help-results { display: grid; gap: 0.65rem; margin-top: 1rem; }
+.help-results article { padding: 0.8rem 0.9rem; border: 1px solid var(--line); border-radius: 10px; }
+.help-results h3 { font-size: 0.95rem; }
+.help-results p { margin-top: 0.3rem; color: var(--ink-2); font-size: 0.87rem; line-height: 1.5; }
+.help-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+@media (max-width: 720px) {
+  header { justify-content: flex-start; }
+  .header-actions { position: static; margin-left: auto; }
+  .brand-name { display: none; }
 }
 
 /* ── Stepper ─────────────────────────────────────────────────────────────*/

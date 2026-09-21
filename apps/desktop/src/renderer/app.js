@@ -309,6 +309,31 @@ $('btn-section-back').addEventListener('click', () => goStep(2));
 $('btn-section-refresh').addEventListener('click', () => loadNotebooks());
 $('btn-start').addEventListener('click', () => { goStep(4); startImport(false); });
 
+// Keep local help available even if the Electron bridge cannot start. This is
+// deliberately registered before import event wiring, so troubleshooting is
+// still reachable when preload or sign-in setup fails.
+const helpDialog = $('help-dialog');
+$('btn-help').addEventListener('click', () => {
+  $('help-search').value = '';
+  filterHelp('');
+  helpDialog.showModal();
+  $('help-search').focus();
+});
+$('btn-help-close').addEventListener('click', () => helpDialog.close());
+$('help-search').addEventListener('input', (event) => filterHelp(event.target.value));
+
+function filterHelp(query) {
+  const words = String(query || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  let shown = 0;
+  document.querySelectorAll('#help-results article').forEach((article) => {
+    const haystack = (article.dataset.help + ' ' + article.textContent).toLowerCase();
+    const match = words.every((word) => haystack.includes(word));
+    article.hidden = !match;
+    if (match) shown++;
+  });
+  $('help-empty').hidden = shown !== 0;
+}
+
 // ── Step 4: importing ──────────────────────────────────────────────────
 
 let counts = { imported: 0, skipped: 0, failed: 0 };
@@ -444,6 +469,14 @@ $('btn-again').addEventListener('click', () => {
   $('file-name').textContent = '';
   $('btn-file-next').disabled = true;
   goStep(2);
+});
+
+// ── Help and experienced-user fast path ────────────────────────────────
+
+$('btn-fast-path').addEventListener('click', () => api.openResource('cli'));
+$('btn-safe-example').addEventListener('click', () => api.openResource('example'));
+document.querySelectorAll('[data-resource]').forEach((button) => {
+  button.addEventListener('click', () => api.openResource(button.dataset.resource));
 });
 
 // ── Boot ───────────────────────────────────────────────────────────────

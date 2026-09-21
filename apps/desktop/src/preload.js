@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Open the user's OneNote in their browser
   openOneNote: () => ipcRenderer.invoke('app:openOneNote'),
+  openResource: (key) => ipcRenderer.invoke('app:openResource', key),
 
   // File picker
   pickEnex: () => ipcRenderer.invoke('files:pickEnex'),

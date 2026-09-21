@@ -23,8 +23,9 @@ paste full error here
 ```
 
 **Minimal reproduction:**
-If possible, attach a minimal `.enex` file (with personal data removed) that reproduces the issue.
+Use the repository's synthetic `examples/safe-example.enex`, or describe a tiny synthetic example. Do **not** attach a real `.enex`, private log, screenshot of private notes, token, `msal-cache.json`, or `progress.json` to this public issue.
 
 **Checklist:**
 - [ ] I have not included my `msal-cache.json` or any access tokens
+- [ ] I have not included real notes, exports, screenshots of notes, or private logs
 - [ ] I have searched existing issues and this is not a duplicate
