@@ -30,7 +30,7 @@ function yearFromCreated(created) {
  * @param {object}   o.client                OneNoteClient
  * @param {object}   o.notebook              { id }
  * @param {object}   o.progress
- * @param {Function} o.noteKeyFn             (filename, note) => string
+ * @param {Function} o.noteKeyFn             (filename, note, index) => string
  * @param {object}   [o.targetSection]       pre-chosen { id } — when set, every note goes here and no section is created (desktop fixed-section import)
  * @param {string}   [o.defaultSectionName]
  * @param {boolean}  [o.dryRun]
@@ -84,10 +84,15 @@ async function importNotes(o) {
 
   const effectiveConcurrency = onConflict === 'ask' ? 1 : concurrency;
   const backoff = globalBackoff || { wait: async () => {}, active: false, set: () => {} };
+  const baseKeys = notes.map((note, i) => noteKeyFn(filename, note, i));
+  const keyCounts = new Map();
+  for (const key of baseKeys) keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
 
   await runParallel(notes, effectiveConcurrency, backoff, async (note, i) => {
     const title = note.title || 'Untitled Note';
-    const key = noteKeyFn(filename, note);
+    // Preserve legacy resume keys for unique notes; distinguish same-title,
+    // same-created notes so a successful import never hides another note.
+    const key = keyCounts.get(baseKeys[i]) > 1 ? `${baseKeys[i]}::note-${i + 1}` : baseKeys[i];
     const ctx = { filename, index: i, total: notes.length, title };
     if (cancelled || shouldCancel()) {
       if (!cancelled) { cancelled = true; onEvent({ type: 'cancelled', ...ctx }); }
@@ -154,7 +159,7 @@ async function importNotes(o) {
           : await client.createPage(sectionRef.section.id, effectiveTitle, page);
         pageId = created && created.id;
       } catch (apiErr) {
-        if (apiErr.message.includes('30102') && !targetSection && notebook && notebook.id) {
+        if ((String(apiErr.code) === '30102' || apiErr.message.includes('30102')) && !targetSection && notebook && notebook.id) {
           sectionRef.overflowCount++;
           const newName = `${sectionRef.baseName} (${sectionRef.overflowCount})`;
           onEvent({ type: 'sectionOverflow', newName, ...ctx });
@@ -181,7 +186,7 @@ async function importNotes(o) {
       // unverified and performs the real import instead of issuing a lookup
       // for "dry-run-page-id".
       markImported(progress, filename, key, dryRun ? null : (pageId || null));
-      saveProgress(progress);
+      await saveProgress(progress);
       onEvent({ type: 'noteImported', pageId: pageId || null, tags: note.tags || [], dryRun, ...ctx });
       counts.succeeded++;
     } catch (err) {

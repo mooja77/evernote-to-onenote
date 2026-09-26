@@ -183,7 +183,7 @@ describe('OneNoteClient — 409 conflict retry', () => {
 
 // ── (c) enex-parser.js — per-note error isolation ────────────────────────────
 
-describe('enex-parser — per-note error isolation', () => {
+describe('enex-parser — corrupt note reporting', () => {
   const xml2jsCachePath = require.resolve('xml2js');
 
   function installFakeXml2js(notes) {
@@ -207,7 +207,7 @@ describe('enex-parser — per-note error isolation', () => {
     delete require.cache[require.resolve('evernote-onenote-engine/src/enex-parser')];
   }
 
-  test('valid notes before/after corrupt note are returned', async () => {
+  test('corrupt note fails the export instead of silently dropping it', async () => {
     const corruptNote = {};
     Object.defineProperty(corruptNote, 'title', {
       get() { throw new Error('simulated corrupt property'); },
@@ -220,32 +220,19 @@ describe('enex-parser — per-note error isolation', () => {
       { title: 'Good Note B', content: '<en-note>B</en-note>', tag: [], resource: null, created: null, updated: null, 'note-attributes': null },
     ]);
 
-    const warnings = [];
-    const origWarn = console.warn;
-    console.warn = (...args) => warnings.push(args.join(' '));
-
     const tmp = path.join(os.tmpdir(), `reliability-test-${Date.now()}.enex`);
     fs.writeFileSync(tmp, '<en-export></en-export>');
 
     try {
       const { parseEnexFile } = require('evernote-onenote-engine/src/enex-parser');
-      const notes = await parseEnexFile(tmp);
-
-      assert.equal(notes.length, 2, 'two valid notes should be returned');
-      assert.equal(notes[0].title, 'Good Note A');
-      assert.equal(notes[1].title, 'Good Note B');
-      assert.ok(
-        warnings.some(w => w.includes('Skipping corrupt')),
-        'should emit a warning for the corrupt note'
-      );
+      await assert.rejects(parseEnexFile(tmp), /Corrupt note 2.*simulated corrupt property/);
     } finally {
-      console.warn = origWarn;
       fs.unlinkSync(tmp);
       restoreXml2js(orig);
     }
   });
 
-  test('single corrupt note returns empty array, not a throw', async () => {
+  test('single corrupt note throws with its position', async () => {
     const corruptNote = {};
     Object.defineProperty(corruptNote, 'title', {
       get() { throw new Error('corrupt'); },
@@ -253,17 +240,13 @@ describe('enex-parser — per-note error isolation', () => {
     });
 
     const orig = installFakeXml2js([corruptNote]);
-    const origWarn = console.warn;
-    console.warn = () => {};
     const tmp = path.join(os.tmpdir(), `reliability-test2-${Date.now()}.enex`);
     fs.writeFileSync(tmp, '<en-export></en-export>');
 
     try {
       const { parseEnexFile } = require('evernote-onenote-engine/src/enex-parser');
-      const notes = await parseEnexFile(tmp);
-      assert.equal(notes.length, 0);
+      await assert.rejects(parseEnexFile(tmp), /Corrupt note 1.*corrupt/);
     } finally {
-      console.warn = origWarn;
       fs.unlinkSync(tmp);
       restoreXml2js(orig);
     }

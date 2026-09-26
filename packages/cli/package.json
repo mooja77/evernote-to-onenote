@@ -1,6 +1,6 @@
 {
   "name": "evernote-to-onenote",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Import Evernote .enex exports into Microsoft OneNote via the Graph API — resumable, scriptable, parallel",
   "license": "MIT",
   "engines": {
@@ -41,7 +41,7 @@
     "prepublishOnly": "node ../../scripts/prepublish-check.mjs && npm test"
   },
   "dependencies": {
-    "evernote-onenote-engine": "^1.0.0",
+    "evernote-onenote-engine": "^1.0.2",
     "open": "^11.0.0"
   }
 }

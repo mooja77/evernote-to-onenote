@@ -1,7 +1,7 @@
 {
   "name": "evernote-to-onenote-desktop",
   "productName": "Evernote to OneNote",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Desktop app that migrates an Evernote .enex export into Microsoft OneNote — for non-technical users.",
   "main": "src/main.js",
   "author": "John Moore",
@@ -17,7 +17,7 @@
     "test": "node ../../scripts/run-tests.mjs"
   },
   "dependencies": {
-    "evernote-onenote-engine": "^1.0.0",
+    "evernote-onenote-engine": "^1.0.2",
     "open": "^11.0.0"
   },
   "devDependencies": {

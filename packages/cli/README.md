@@ -143,7 +143,7 @@ Need more help before you start? See:
 - **Safe preview.** `--dry-run` shows exactly what would be imported. Nothing is written to OneNote until you remove the flag.
 - **Resumable.** Every note is checkpointed. `--resume` skips notes already verified in OneNote.
 - **Parallel imports.** `--concurrency N` (default 3) runs multiple workers. ~3× faster on large exports.
-- **Conflict detection.** Four strategies for duplicate page titles: `skip` (default), `rename`, `overwrite`, `ask`.
+- **Optional conflict detection.** Four strategies for duplicate page titles: `skip`, `rename`, `overwrite`, `ask`. Off by default so distinct notes with the same title are not silently dropped.
 - **Tags.** Evernote tags become searchable `#hashtag` footers in OneNote pages.
 - **Metadata preservation.** Creation date, author, and source URL are embedded in a header on each page.
 - **Selective import.** Filter by notebook name (`--notebooks "Work-*"`) or date range (`--date-range 2020-01-01..2023-12-31`).
@@ -179,7 +179,7 @@ Options:
   --year-sections        Organise notes by year (sections: 2018, 2019, …)
   --output-html <dir>    Save notes as HTML files locally (no account needed)
   --tags-strategy <s>    Tags as: page-metadata (default) or section-groups
-  --on-conflict <mode>   Duplicate titles: skip (default), rename, overwrite, ask
+  --on-conflict <mode>   Duplicate titles: skip, rename, overwrite, ask (off by default)
   --concurrency <N>      Notes to import in parallel (default: 3, max: 10)
   --notebooks <pattern>  Only import notebooks matching a pattern: "Work-*,Personal"
   --date-range <range>   Only import notes in a date range: 2020-01-01..2023-12-31

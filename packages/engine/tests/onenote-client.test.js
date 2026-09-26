@@ -149,6 +149,72 @@ describe('OneNoteClient — live mode (fetch intercepted)', () => {
 
   after(() => { fetchHandler = null; });
 
+  test('finds an existing notebook on a later Graph page', async () => {
+    let posts = 0;
+    fetchHandler = async (url, opts) => {
+      if (opts.method === 'POST') posts++;
+      if (url.endsWith('/notebooks')) return makeFakeResponse(200, { value: [], '@odata.nextLink': 'https://graph.microsoft.com/next-notebooks' });
+      return makeFakeResponse(200, { value: [{ id: 'existing', displayName: 'Later' }] });
+    };
+    const found = await new OneNoteClient({ accessToken: 'token' }).createNotebook('Later');
+    assert.equal(found.id, 'existing');
+    assert.equal(posts, 0);
+  });
+
+  test('refreshes after a rate limit followed by 401', async () => {
+    let calls = 0;
+    let refreshes = 0;
+    fetchHandler = async (_url, opts) => {
+      calls++;
+      if (calls === 1) return makeFakeResponse(429, {}, { 'Retry-After': '0' });
+      if (calls === 2) return makeFakeResponse(401, {});
+      assert.equal(opts.headers.Authorization, 'Bearer fresh');
+      return makeFakeResponse(200, { value: [] });
+    };
+    const client = new OneNoteClient({ getToken: async force => {
+      if (force) refreshes++;
+      return force ? 'fresh' : 'old';
+    } });
+    assert.deepEqual(await client.listNotebooks(), []);
+    assert.equal(refreshes, 1);
+  });
+
+  test('rebuilds and resends multipart bytes after 429', async () => {
+    const bodies = [];
+    const streams = [];
+    fetchHandler = async (_url, opts) => {
+      streams.push(opts.body);
+      bodies.push(opts.body.getBuffer());
+      return bodies.length === 1
+        ? makeFakeResponse(429, {}, { 'Retry-After': '0' })
+        : makeFakeResponse(201, { id: 'page' });
+    };
+    const client = new OneNoteClient({ accessToken: 'token' });
+    await client.createPageWithAttachments('section', 'title', '<html>body</html>', [
+      { partName: 'part1', contentType: 'image/png', data: Buffer.from('binary-attachment') },
+    ]);
+    assert.equal(bodies.length, 2);
+    assert.notEqual(streams[0], streams[1]);
+    for (const body of bodies) {
+      assert.match(body.toString(), /binary-attachment/);
+      assert.match(body.toString(), /<html>body<\/html>/);
+    }
+  });
+
+  test('preserves section-overflow code on HTTP 507', async () => {
+    fetchHandler = async () => makeFakeResponse(507, { error: { code: '30102', message: 'section full' } });
+    const client = new OneNoteClient({ accessToken: 'token' });
+    await assert.rejects(client.createPage('section', 'title', '<html/>'), err => err.code === '30102');
+  });
+
+  test('does not blindly retry a POST after an ambiguous network failure', async () => {
+    let calls = 0;
+    fetchHandler = async () => { calls++; throw new Error('connection reset'); };
+    const client = new OneNoteClient({ accessToken: 'token' });
+    await assert.rejects(client.createPage('section', 'title', '<html/>'), /outcome is unknown/);
+    assert.equal(calls, 1);
+  });
+
   // ── Rate-limit retry behaviour ─────────────────────────────────────────────
 
   test('retries on 429 and succeeds when next response is 200', async () => {

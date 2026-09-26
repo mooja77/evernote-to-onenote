@@ -337,6 +337,26 @@ describe('CLI — --output-html mode', () => {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
   });
+
+  test('repeated exports keep each HTML file paired with its own assets directory', () => {
+    const outDir = makeTempDir('html-resource-collision');
+    try {
+      assert.equal(run([fix('with-resources.enex'), '--output-html', outDir]).status, 0);
+      assert.equal(run([fix('with-resources.enex'), '--output-html', outDir]).status, 0);
+      const htmlFiles = findHtmlFiles(outDir);
+      assert.equal(htmlFiles.length, 2);
+      for (const file of htmlFiles) {
+        const html = fs.readFileSync(file, 'utf8');
+        const relativeAsset = html.match(/src=["']([^"']+\.assets\/[^"']+)["']/i)?.[1];
+        assert.ok(relativeAsset, `asset reference missing in ${file}`);
+        assert.ok(fs.existsSync(path.join(path.dirname(file), decodeURIComponent(relativeAsset))));
+      }
+      const refs = htmlFiles.map(file => fs.readFileSync(file, 'utf8').match(/\.assets\/part\d+\.[a-z0-9]+/i)?.[0]);
+      assert.equal(refs.length, 2);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── Resume / progress tracking ───────────────────────────────────────────────

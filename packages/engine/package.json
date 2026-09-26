@@ -1,6 +1,6 @@
 {
   "name": "evernote-onenote-engine",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Shared engine for Evernote ENEX → OneNote import: parsing, ENML conversion, Graph client, resumable progress ledger.",
   "license": "MIT",
   "engines": {
