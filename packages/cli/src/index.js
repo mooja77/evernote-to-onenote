@@ -343,9 +343,12 @@ async function importNotes({
     const counts = { succeeded: 0, failed: 0, skipped: 0 };
     const backoff = globalBackoff || { wait: async () => {}, active: false, set: () => {} };
 
+    const outputBaseKeys = notes.map(note => noteKey(filename, note));
+    const outputKeyCounts = new Map();
+    for (const key of outputBaseKeys) outputKeyCounts.set(key, (outputKeyCounts.get(key) || 0) + 1);
     await runParallel(notes, concurrency, backoff, async (note, i) => {
       const title = note.title || 'Untitled Note';
-      const key = noteKey(filename, note);
+      const key = outputKeyCounts.get(outputBaseKeys[i]) > 1 ? `${outputBaseKeys[i]}::note-${i + 1}` : outputBaseKeys[i];
       const label = `[file ${fileIndex}/${fileCount}: ${filename}] [note ${i + 1}/${notes.length}]`;
 
       try {
@@ -379,7 +382,7 @@ async function importNotes({
         // attributes accordingly. This makes each .html + .assets folder
         // pair self-contained and droppable into any note app.
         if (usedResources.length > 0) {
-          const assetsDirName = `${safeName}.assets`;
+          const assetsDirName = `${path.basename(outFile, '.html')}.assets`;
           const assetsDirAbs = path.join(notebookDir, assetsDirName);
           if (!fs.existsSync(assetsDirAbs)) fs.mkdirSync(assetsDirAbs, { recursive: true });
           for (const r of usedResources) {
@@ -402,7 +405,7 @@ async function importNotes({
         fs.writeFileSync(outFile, toOneNoteHtml(title, html, meta), 'utf8');
         if (!quiet) console.log(`    ✓ Saved: ${outFile}`);
         markImported(progress, filename, key, null);
-        doSave();
+        await doSave();
         counts.succeeded++;
       } catch (err) {
         const hint = describeError(err);
@@ -647,7 +650,7 @@ async function main() {
       '  --year-sections        Organise notes by year (sections: 2018, 2019, …)',
       '  --output-html <dir>    Save notes as HTML files locally (no Microsoft account needed)',
       '  --tags-strategy <s>    Tags as: page-metadata (default, #hashtag footer) or section-groups',
-      '  --on-conflict <mode>   If a page title already exists: skip (default), rename, overwrite, ask',
+      '  --on-conflict <mode>   If a page title already exists: skip, rename, overwrite, ask (off by default)',
       '  --concurrency <N>      Number of notes to import at once (default: 3, max: 10)',
       '  --notebooks <pattern>  Only import notebooks matching a pattern: --notebooks "Work-*,Personal"',
       '  --date-range <range>   Only import notes in a date range: --date-range 2020-01-01..2023-12-31',

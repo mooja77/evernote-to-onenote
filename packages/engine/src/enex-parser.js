@@ -16,14 +16,6 @@ async function parseEnexFile(filePath) {
   if (stat.size > MAX_FILE_SIZE_BYTES) {
     throw new Error(`ENEX file too large (${(stat.size / 1024 / 1024).toFixed(0)}MB > 500MB limit): ${filePath}`);
   }
-  const xml = await fs.promises.readFile(filePath, 'utf8');
-  const parser = new xml2js.Parser({ explicitArray: false, explicitCharkey: true });
-
-  const result = await parser.parseStringPromise(xml);
-  const enExport = result['en-export'];
-  if (!enExport || typeof enExport !== 'object') {
-    throw new Error('Not a valid Evernote export: expected an <en-export> root element.');
-  }
   // xml2js holds both the UTF-8 source and a JS object tree. Refuse a parse
   // that is likely to exhaust currently available memory instead of letting
   // the desktop process freeze or be terminated by the OS.
@@ -35,6 +27,13 @@ async function parseEnexFile(filePath) {
       'Close other applications, split the Evernote export into smaller files, and try again.'
     );
   }
+  const xml = await fs.promises.readFile(filePath, 'utf8');
+  const parser = new xml2js.Parser({ explicitArray: false, explicitCharkey: true });
+  const result = await parser.parseStringPromise(xml);
+  const enExport = result['en-export'];
+  if (!enExport || typeof enExport !== 'object') {
+    throw new Error('Not a valid Evernote export: expected an <en-export> root element.');
+  }
 
   // Handle single note or array of notes
   let notes = enExport.note;
@@ -42,7 +41,7 @@ async function parseEnexFile(filePath) {
   if (!Array.isArray(notes)) notes = [notes];
 
   const results = [];
-  for (const note of notes) {
+  for (const [index, note] of notes.entries()) {
     try {
       const attrs = note['note-attributes'] || null;
       results.push({
@@ -58,7 +57,7 @@ async function parseEnexFile(filePath) {
     } catch (err) {
       let safeTitle = '<untitled>';
       try { safeTitle = getText(note.title) || '<untitled>'; } catch { /* title itself is corrupt */ }
-      console.warn(`[enex-parser] Skipping corrupt note "${safeTitle}": ${err.message}`);
+      throw new Error(`Corrupt note ${index + 1} "${safeTitle}" in ${filePath}: ${err.message}`, { cause: err });
     }
   }
   return results;

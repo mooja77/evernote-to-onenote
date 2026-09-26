@@ -47,8 +47,7 @@ class OneNoteClient {
       console.log(`  [dry-run] Would create notebook: "${name}"`);
       return { id: 'dry-run-notebook-id', displayName: name };
     }
-    const existing = await this._get(`${GRAPH_BASE}/notebooks`);
-    const found = existing.value.find(n => n.displayName === name);
+    const found = (await this.listNotebooks()).find(n => n.displayName === name);
     if (found) {
       console.log(`  Using existing notebook: "${name}"`);
       return found;
@@ -61,8 +60,7 @@ class OneNoteClient {
       console.log(`  [dry-run] Would create section: "${name}" in notebook ${notebookId}`);
       return { id: 'dry-run-section-id', displayName: name };
     }
-    const existing = await this._get(`${GRAPH_BASE}/notebooks/${notebookId}/sections`);
-    const found = existing.value.find(s => s.displayName === name);
+    const found = (await this.listSections(notebookId)).find(s => s.displayName === name);
     if (found) {
       console.log(`  Using existing section: "${name}"`);
       return found;
@@ -101,30 +99,23 @@ class OneNoteClient {
       return { id: 'dry-run-page-id', title };
     }
 
-    const form = new FormData();
-
-    // Presentation part must come first
-    form.append('Presentation', htmlContent, {
-      contentType: 'text/html',
-      filename: 'Presentation',
-    });
-
-    for (const resource of resources) {
-      form.append(resource.partName, resource.data, {
-        contentType: resource.contentType,
-        filename: resource.partName,
-      });
-    }
-
     const url = `${GRAPH_BASE}/sections/${sectionId}/pages`;
     const token = await this._token();
-    return this._fetchWithRetry(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...form.getHeaders(),
-      },
-      body: form,
+    return this._fetchWithRetry(url, () => {
+      const form = new FormData();
+      // Every retry needs a new stream and its matching multipart boundary.
+      form.append('Presentation', htmlContent, { contentType: 'text/html', filename: 'Presentation' });
+      for (const resource of resources) {
+        form.append(resource.partName, resource.data, {
+          contentType: resource.contentType,
+          filename: resource.partName,
+        });
+      }
+      return {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, ...form.getHeaders() },
+        body: form,
+      };
     });
   }
 
@@ -133,8 +124,7 @@ class OneNoteClient {
       console.log(`  [dry-run] Would create section group: "${name}" in notebook ${notebookId}`);
       return { id: 'dry-run-sectiongroup-id', displayName: name };
     }
-    const existing = await this._get(`${GRAPH_BASE}/notebooks/${notebookId}/sectionGroups`);
-    const found = (existing.value || []).find(g => g.displayName === name);
+    const found = (await this._listAll(`${GRAPH_BASE}/notebooks/${notebookId}/sectionGroups`)).find(g => g.displayName === name);
     if (found) return found;
     return this._post(`${GRAPH_BASE}/notebooks/${notebookId}/sectionGroups`, { displayName: name });
   }
@@ -144,8 +134,7 @@ class OneNoteClient {
       console.log(`  [dry-run] Would create section: "${name}" in section group ${sectionGroupId}`);
       return { id: 'dry-run-section-in-group-id', displayName: name };
     }
-    const existing = await this._get(`${GRAPH_BASE}/sectionGroups/${sectionGroupId}/sections`);
-    const found = (existing.value || []).find(s => s.displayName === name);
+    const found = (await this._listAll(`${GRAPH_BASE}/sectionGroups/${sectionGroupId}/sections`)).find(s => s.displayName === name);
     if (found) return found;
     return this._post(`${GRAPH_BASE}/sectionGroups/${sectionGroupId}/sections`, { displayName: name });
   }
@@ -153,8 +142,11 @@ class OneNoteClient {
   // ─── Public list/read methods ────────────────────────────────────────────
 
   async listNotebooks() {
+    return this._listAll(`${GRAPH_BASE}/notebooks`);
+  }
+
+  async _listAll(url) {
     const results = [];
-    let url = `${GRAPH_BASE}/notebooks`;
     while (url) {
       const page = await this._get(url);
       results.push(...(page.value || []));
@@ -164,14 +156,7 @@ class OneNoteClient {
   }
 
   async listSections(notebookId) {
-    const results = [];
-    let url = `${GRAPH_BASE}/notebooks/${notebookId}/sections`;
-    while (url) {
-      const page = await this._get(url);
-      results.push(...(page.value || []));
-      url = page['@odata.nextLink'] || null;
-    }
-    return results;
+    return this._listAll(`${GRAPH_BASE}/notebooks/${notebookId}/sections`);
   }
 
   async listPages(sectionId) {
@@ -229,21 +214,28 @@ class OneNoteClient {
     });
   }
 
-  async _fetchWithRetry(url, options, attempt = 1) {
+  async _fetchWithRetry(url, options, attempt = 1, refreshed = false) {
+    // A factory is required for stream bodies: form-data streams cannot be sent twice.
+    const requestOptions = typeof options === 'function' ? options() : options;
     const start = Date.now();
     let res;
     try {
-      res = await fetch(url, options);
+      res = await fetch(url, requestOptions);
     } catch (networkErr) {
+      // The server may have accepted a POST before the connection failed.
+      // Retrying it blindly can create duplicate pages.
+      if ((requestOptions.method || 'GET').toUpperCase() === 'POST') {
+        throw new Error(`OneNote POST outcome is unknown after a network error; check OneNote before retrying: ${networkErr.message}`);
+      }
       if (attempt > MAX_RETRIES) throw networkErr;
       const delay = backoffDelay(attempt);
       console.warn(`  [network-error] ${networkErr.message} — retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
-      return this._fetchWithRetry(url, options, attempt + 1);
+      return this._fetchWithRetry(url, options, attempt + 1, refreshed);
     }
 
     const duration = Date.now() - start;
-    const method = options.method || 'GET';
+    const method = requestOptions.method || 'GET';
     console.log(`  [api] ${method} ${url} → ${res.status} (${duration}ms)`);
 
     if (res.status === 429) {
@@ -256,23 +248,20 @@ class OneNoteClient {
       if (this._globalBackoff) this._globalBackoff.set(delay);
       console.warn(`  [rate-limit] 429 — waiting ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
-      return this._fetchWithRetry(url, options, attempt + 1);
+      return this._fetchWithRetry(url, options, attempt + 1, refreshed);
     }
 
     if (res.status === 401) {
-      if (attempt > 1) {
+      if (refreshed) {
         throw new Error('OneNote API 401 after token refresh — authentication failed');
       }
       console.warn('  [auth] 401 received — refreshing token and retrying');
       const freshToken = await this._token(true);
-      const refreshedOptions = {
-        ...options,
-        headers: {
-          ...options.headers,
-          Authorization: `Bearer ${freshToken}`,
-        },
+      const refreshedOptions = () => {
+        const next = typeof options === 'function' ? options() : options;
+        return { ...next, headers: { ...next.headers, Authorization: `Bearer ${freshToken}` } };
       };
-      return this._fetchWithRetry(url, refreshedOptions, attempt + 1);
+      return this._fetchWithRetry(url, refreshedOptions, attempt + 1, true);
     }
 
     if (res.status === 409) {
@@ -283,7 +272,7 @@ class OneNoteClient {
       const delay = retryAfterDelayMs(res.headers) ?? backoffDelay(attempt);
       console.warn(`  [conflict] 409 — retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
-      return this._fetchWithRetry(url, options, attempt + 1);
+      return this._fetchWithRetry(url, options, attempt + 1, refreshed);
     }
 
     if (res.status === 503) {
@@ -292,14 +281,22 @@ class OneNoteClient {
       const delay = retryAfter503Ms ?? backoffDelay(attempt);
       console.warn(`  [service-unavailable] 503 — retrying in ${(delay / 1000).toFixed(1)}s (attempt ${attempt}/${MAX_RETRIES})`);
       await sleep(delay);
-      return this._fetchWithRetry(url, options, attempt + 1);
+      return this._fetchWithRetry(url, options, attempt + 1, refreshed);
     }
 
     if (res.status === 507) {
+      const body = await res.text();
+      let graphCode;
+      try { graphCode = JSON.parse(body).error?.code; } catch { /* non-JSON response */ }
+      if (String(graphCode) === '30102' || /\b30102\b/.test(body)) {
+        const error = new Error(`OneNote section capacity exceeded (30102): ${body.slice(0, 500)}`);
+        error.code = '30102';
+        throw error;
+      }
       throw new Error(
         'OneDrive storage full (507 Insufficient Storage). ' +
         'Free up space at https://onedrive.live.com before retrying. ' +
-        'Import progress has been saved and can be resumed with --resume.'
+        `Import progress has been saved and can be resumed with --resume. ${body.slice(0, 200)}`
       );
     }
 

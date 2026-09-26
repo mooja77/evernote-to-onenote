@@ -17,6 +17,56 @@ function fakeClient() {
 
 const noteKeyFn = (filename, note) => `${filename}::${note.title || 'Untitled'}::${note.created || ''}`;
 
+test('same-title same-created notes receive distinct resume keys', async () => {
+  const keys = [];
+  const client = fakeClient();
+  const progress = { version: 2, files: {} };
+  const notes = Array.from({ length: 2 }, () => ({ title: 'Same', created: '20260101', content: '<en-note/>', resources: [] }));
+  const first = await importNotes({ notes, filename: 'Book.enex', client, notebook: { id: null },
+    progress, targetSection: { id: 'sec' }, noteKeyFn,
+    markImported: (_progress, _filename, key) => keys.push(key), saveProgress: () => {} });
+  assert.strictEqual(first.succeeded, 2);
+  assert.notStrictEqual(keys[0], keys[1]);
+});
+
+test('waits for progress persistence before reporting an import complete', async () => {
+  const events = [];
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }], filename: 'Book.enex',
+    client: fakeClient(), notebook: { id: null }, progress: { version: 2, files: {} },
+    targetSection: { id: 'sec' }, noteKeyFn,
+    saveProgress: async () => { throw new Error('disk full'); },
+    onEvent: e => events.push(e),
+  });
+  assert.strictEqual(counts.succeeded, 0);
+  assert.strictEqual(counts.failed, 1);
+  assert.ok(events.some(e => e.type === 'error' && /disk full/.test(e.message)));
+});
+
+test('section-capacity error creates an overflow section and retries the page', async () => {
+  const sections = [];
+  const client = fakeClient();
+  client.createSection = async (_notebookId, name) => {
+    sections.push(name);
+    return { id: `sec-${name}`, displayName: name };
+  };
+  let pageCalls = 0;
+  client.createPage = async () => {
+    pageCalls++;
+    if (pageCalls === 1) throw Object.assign(new Error('section full'), { code: '30102' });
+    return { id: 'overflow-page' };
+  };
+  const events = [];
+  const counts = await importNotes({
+    notes: [{ title: 'A', content: '<en-note/>', resources: [] }], filename: 'Book.enex',
+    client, notebook: { id: 'notebook' }, progress: { version: 2, files: {} },
+    defaultSectionName: 'Imported', noteKeyFn, saveProgress: () => {}, onEvent: e => events.push(e),
+  });
+  assert.strictEqual(counts.succeeded, 1);
+  assert.deepStrictEqual(sections, ['Imported', 'Imported (1)']);
+  assert.ok(events.some(e => e.type === 'sectionOverflow'));
+});
+
 test('emits noteImported for each new note and returns counts', async () => {
   const events = [];
   const progress = { version: 2, files: {} };
