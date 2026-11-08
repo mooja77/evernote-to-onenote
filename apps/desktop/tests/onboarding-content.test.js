@@ -21,3 +21,12 @@ test('safe example and matching caption track are present', () => {
   assert.match(example, /synthetic example data/i);
   assert.match(captions, /^WEBVTT/);
 });
+
+test('destination is spelled out (account, file, notebook, section) before Start import', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'apps/desktop/src/renderer/index.html'), 'utf8');
+  const js = fs.readFileSync(path.join(ROOT, 'apps/desktop/src/renderer/app.js'), 'utf8');
+  assert.match(html, /id="dest-summary"/);
+  assert.match(js, /function updateDestination\(/);
+  assert.match(js, /state\.sectionLabel/);
+  assert.match(js, /'dest-summary'/);
+});
