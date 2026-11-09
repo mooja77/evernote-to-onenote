@@ -6,7 +6,7 @@ Use your browser's page search (`Ctrl+F` or `Cmd+F`) to find an error or keyword
 
 1. Export one Evernote notebook as an `.enex` file.
 2. Sign in to the Microsoft account that owns the target OneNote.
-3. Choose the `.enex` file and target section.
+3. Choose the `.enex` file and target section. The app then spells out the destination (account, notebook and section) before you press Start import.
 4. Start the import and keep the app open.
 5. Open OneNote and check the imported pages.
 

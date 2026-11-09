@@ -6,7 +6,7 @@
 const $ = (id) => document.getElementById(id);
 const STEPS = { 1: 'step-signin', 2: 'step-file', 3: 'step-section', 4: 'step-import', 5: 'step-done' };
 
-const state = { enexPath: null, enexName: null, sectionId: null, total: 0 };
+const state = { enexPath: null, enexName: null, sectionId: null, sectionLabel: null, total: 0 };
 let signedIn = false;
 
 function goStep(n) {
@@ -75,6 +75,17 @@ function setAccount(account) {
   const who = account && (account.username || account.name);
   signedIn = !!who;
   if (who) $('account-who').textContent = 'Signed in as ' + who;
+}
+
+// Spell out exactly where the notes will go before anything is written.
+function updateDestination() {
+  const box = $('dest-summary');
+  if (!state.sectionId || !state.sectionLabel) { box.hidden = true; return; }
+  const who = $('account-who').textContent.replace(/^Signed in as /, '');
+  box.textContent = 'Notes from ' + (state.enexName || 'your export') +
+    ' will be added as pages in OneNote section "' + state.sectionLabel + '"' +
+    (who ? ' (' + who + ')' : '') + '.';
+  box.hidden = false;
 }
 
 // ── Step 1: sign in ────────────────────────────────────────────────────
@@ -216,9 +227,11 @@ function renderNotebooks(notebooks, selectSectionId) {
         radio.value = sec.id;
         radio.addEventListener('change', () => {
           state.sectionId = sec.id;
+          state.sectionLabel = nb.name + ' › ' + sec.name;
           document.querySelectorAll('.section-opt').forEach((o) => o.classList.remove('selected'));
           opt.classList.add('selected');
           $('btn-start').disabled = false;
+          updateDestination();
         });
         const text = document.createElement('span');
         text.textContent = sec.name;
@@ -234,7 +247,9 @@ function renderNotebooks(notebooks, selectSectionId) {
           radio.checked = true;
           opt.classList.add('selected');
           state.sectionId = sec.id;
+          state.sectionLabel = nb.name + ' › ' + sec.name;
           $('btn-start').disabled = false;
+          updateDestination();
         }
       }
       head.addEventListener('click', () => {
